@@ -1,0 +1,290 @@
+import type { Lead, Client, Requirement, Quotation, Agreement, Payment, Invoice, Project, Task, SupportTicket, Document } from '../types/database'
+
+// ─── Demo Data ────────────────────────────────────────────────────────────────
+
+export const demoLeads: Lead[] = [
+  {
+    id: 'lead-001', name: 'Sarah Johnson', email: 'sarah@techvision.co.za', phone: '+27 82 123 4567',
+    company: 'TechVision Pty Ltd', status: 'proposal', source: 'website', budget: 25000,
+    notes: 'Interested in e-commerce solution with payment gateway integration.',
+    assigned_to: null, next_follow_up: '2026-11-25T10:00:00Z',
+    created_at: '2026-11-01T08:00:00Z', updated_at: '2026-11-15T14:30:00Z',
+  },
+  {
+    id: 'lead-002', name: 'Marcus Williams', email: 'marcus@greenleaf.co.za', phone: '+27 71 987 6543',
+    company: 'GreenLeaf Organics', status: 'contacted', source: 'referral', budget: 15000,
+    notes: 'Looking for a corporate brochure website with blog.',
+    assigned_to: null, next_follow_up: '2026-11-22T09:00:00Z',
+    created_at: '2026-11-05T10:00:00Z', updated_at: '2026-11-18T11:00:00Z',
+  },
+  {
+    id: 'lead-003', name: 'Priya Naidoo', email: 'priya@stellarlaw.co.za', phone: '+27 83 456 7890',
+    company: 'Stellar Law Chambers', status: 'qualified', source: 'social', budget: 35000,
+    notes: 'Professional law firm website with client portal and document management.',
+    assigned_to: null, next_follow_up: '2026-11-23T14:00:00Z',
+    created_at: '2026-11-08T09:30:00Z', updated_at: '2026-11-19T16:00:00Z',
+  },
+  {
+    id: 'lead-004', name: 'David Chen', email: 'david@apexfin.co.za', phone: '+27 76 234 5678',
+    company: 'Apex Financial', status: 'won', source: 'email', budget: 55000,
+    notes: 'Full financial services platform with dashboard and reporting.',
+    assigned_to: null, next_follow_up: null,
+    created_at: '2026-10-20T08:00:00Z', updated_at: '2026-11-10T12:00:00Z',
+  },
+  {
+    id: 'lead-005', name: 'Fatima Patel', email: 'fatima@luxebrides.co.za', phone: '+27 84 567 8901',
+    company: 'Luxe Brides', status: 'new', source: 'social', budget: 12000,
+    notes: 'Wedding photography portfolio website with gallery and booking system.',
+    assigned_to: null, next_follow_up: '2026-11-24T11:00:00Z',
+    created_at: '2026-11-19T13:00:00Z', updated_at: '2026-11-19T13:00:00Z',
+  },
+  {
+    id: 'lead-006', name: 'James Botha', email: 'james@craftbrews.co.za', phone: '+27 73 345 6789',
+    company: 'Cape Craft Brews', status: 'lost', source: 'referral', budget: 20000,
+    notes: 'Went with a competitor. Price was the main concern.',
+    assigned_to: null, next_follow_up: null,
+    created_at: '2026-10-10T08:00:00Z', updated_at: '2026-11-01T10:00:00Z',
+  },
+]
+
+export const demoClients: Client[] = [
+  {
+    id: 'client-001', lead_id: 'lead-004', name: 'David Chen', email: 'david@apexfin.co.za',
+    phone: '+27 76 234 5678', company: 'Apex Financial', address: '12 Buitenkant St',
+    city: 'Cape Town', country: 'South Africa', status: 'active', avatar_url: null,
+    notes: 'Premium client. Always pays on time.',
+    created_at: '2026-10-25T08:00:00Z', updated_at: '2026-11-10T12:00:00Z',
+  },
+  {
+    id: 'client-002', lead_id: null, name: 'Amanda Steyn', email: 'amanda@stylehaus.co.za',
+    phone: '+27 82 678 9012', company: 'StyleHaus Fashion', address: '45 Long St',
+    city: 'Cape Town', country: 'South Africa', status: 'active', avatar_url: null,
+    notes: 'Fashion e-commerce client. Requires fast turnaround.',
+    created_at: '2026-09-15T09:00:00Z', updated_at: '2026-11-05T14:00:00Z',
+  },
+  {
+    id: 'client-003', lead_id: null, name: 'Nomvula Dlamini', email: 'nomvula@horizonhealth.co.za',
+    phone: '+27 71 789 0123', company: 'Horizon Health Clinic', address: '78 Main Rd',
+    city: 'Johannesburg', country: 'South Africa', status: 'active', avatar_url: null,
+    notes: 'Healthcare portal with appointment booking.',
+    created_at: '2026-08-20T10:00:00Z', updated_at: '2026-11-01T09:00:00Z',
+  },
+  {
+    id: 'client-004', lead_id: null, name: 'Robert Kruger', email: 'robert@pinnacleprops.co.za',
+    phone: '+27 83 890 1234', company: 'Pinnacle Properties', address: '23 Kloof St',
+    city: 'Cape Town', country: 'South Africa', status: 'inactive', avatar_url: null,
+    notes: 'Real estate listing platform. Currently on hold.',
+    created_at: '2026-07-10T08:00:00Z', updated_at: '2026-10-20T16:00:00Z',
+  },
+]
+
+export const demoProjects: Project[] = [
+  {
+    id: 'proj-001', client_id: 'client-001', agreement_id: 'agr-001',
+    name: 'Apex Financial Dashboard', description: 'Full financial services platform with analytics dashboard and reporting module.',
+    status: 'development', priority: 'high',
+    start_date: '2026-11-01T00:00:00Z', deadline: '2027-01-31T00:00:00Z', completed_at: null,
+    website_url: null, staging_url: 'https://staging.apexfin.co.za',
+    repository_url: 'https://github.com/capesecure/apex-financial', tech_stack: ['React', 'Node.js', 'PostgreSQL'],
+    progress: 45,
+    created_at: '2026-11-01T08:00:00Z', updated_at: '2026-11-19T14:00:00Z',
+  },
+  {
+    id: 'proj-002', client_id: 'client-002', agreement_id: 'agr-002',
+    name: 'StyleHaus E-Commerce', description: 'Fashion e-commerce store with product catalog, cart, and payment integration.',
+    status: 'design', priority: 'medium',
+    start_date: '2026-10-15T00:00:00Z', deadline: '2026-12-15T00:00:00Z', completed_at: null,
+    website_url: null, staging_url: 'https://staging.stylehaus.co.za',
+    repository_url: 'https://github.com/capesecure/stylehaus', tech_stack: ['Next.js', 'Stripe', 'Prisma'],
+    progress: 25,
+    created_at: '2026-10-15T09:00:00Z', updated_at: '2026-11-18T16:00:00Z',
+  },
+  {
+    id: 'proj-003', client_id: 'client-003', agreement_id: null,
+    name: 'Horizon Health Portal', description: 'Patient portal with appointment booking, medical records and telemedicine.',
+    status: 'review', priority: 'high',
+    start_date: '2026-09-01T00:00:00Z', deadline: '2026-11-30T00:00:00Z', completed_at: null,
+    website_url: null, staging_url: 'https://staging.horizonhealth.co.za',
+    repository_url: 'https://github.com/capesecure/horizon-health', tech_stack: ['React', 'Express', 'MongoDB'],
+    progress: 80,
+    created_at: '2026-09-01T10:00:00Z', updated_at: '2026-11-20T11:00:00Z',
+  },
+  {
+    id: 'proj-004', client_id: 'client-004', agreement_id: null,
+    name: 'Pinnacle Properties Listings', description: 'Real estate listing platform with map integration and agent management.',
+    status: 'paused', priority: 'low',
+    start_date: '2026-07-15T00:00:00Z', deadline: '2026-10-31T00:00:00Z', completed_at: null,
+    website_url: null, staging_url: null,
+    repository_url: 'https://github.com/capesecure/pinnacle-props', tech_stack: ['Vue.js', 'Laravel', 'MySQL'],
+    progress: 15,
+    created_at: '2026-07-15T08:00:00Z', updated_at: '2026-10-20T16:00:00Z',
+  },
+]
+
+export const demoPayments: Payment[] = [
+  {
+    id: 'pay-001', client_id: 'client-001', project_id: 'proj-001', invoice_id: 'inv-001', agreement_id: 'agr-001',
+    reference: 'PAY-2026-001', amount: 27500, currency: 'ZAR', payment_type: 'advance',
+    payment_method: 'bank_transfer', status: 'received',
+    received_date: '2026-11-02T00:00:00Z', notes: '50% advance payment received.',
+    proof_url: null, created_at: '2026-11-02T10:00:00Z', updated_at: '2026-11-02T10:00:00Z',
+  },
+  {
+    id: 'pay-002', client_id: 'client-002', project_id: 'proj-002', invoice_id: null, agreement_id: null,
+    reference: 'PAY-2026-002', amount: 10000, currency: 'ZAR', payment_type: 'advance',
+    payment_method: 'bank_transfer', status: 'received',
+    received_date: '2026-10-16T00:00:00Z', notes: 'Initial deposit.',
+    proof_url: null, created_at: '2026-10-16T09:00:00Z', updated_at: '2026-10-16T09:00:00Z',
+  },
+  {
+    id: 'pay-003', client_id: 'client-003', project_id: 'proj-003', invoice_id: null, agreement_id: null,
+    reference: 'PAY-2026-003', amount: 15000, currency: 'ZAR', payment_type: 'milestone',
+    payment_method: 'card', status: 'received',
+    received_date: '2026-11-01T00:00:00Z', notes: 'Milestone 1 payment.',
+    proof_url: null, created_at: '2026-11-01T14:00:00Z', updated_at: '2026-11-01T14:00:00Z',
+  },
+  {
+    id: 'pay-004', client_id: 'client-001', project_id: 'proj-001', invoice_id: null, agreement_id: 'agr-001',
+    reference: 'PAY-2026-004', amount: 27500, currency: 'ZAR', payment_type: 'final',
+    payment_method: 'bank_transfer', status: 'pending',
+    received_date: null, notes: 'Final payment due upon completion.',
+    proof_url: null, created_at: '2026-11-01T08:00:00Z', updated_at: '2026-11-01T08:00:00Z',
+  },
+]
+
+export const demoTasks: Task[] = [
+  {
+    id: 'task-001', project_id: 'proj-001', title: 'Design dashboard wireframes',
+    description: 'Create wireframes for the main analytics dashboard.',
+    status: 'done', priority: 'high', assigned_to: 'Design Team',
+    due_date: '2026-11-10T00:00:00Z', completed_at: '2026-11-09T16:00:00Z', tags: ['design', 'wireframes'],
+    created_at: '2026-11-01T09:00:00Z', updated_at: '2026-11-09T16:00:00Z',
+  },
+  {
+    id: 'task-002', project_id: 'proj-001', title: 'Set up database schema',
+    description: 'Create PostgreSQL schema for financial data.',
+    status: 'done', priority: 'high', assigned_to: 'Backend Team',
+    due_date: '2026-11-08T00:00:00Z', completed_at: '2026-11-07T17:00:00Z', tags: ['backend', 'database'],
+    created_at: '2026-11-01T09:00:00Z', updated_at: '2026-11-07T17:00:00Z',
+  },
+  {
+    id: 'task-003', project_id: 'proj-001', title: 'Implement authentication',
+    description: 'Set up JWT auth with role-based access control.',
+    status: 'in_progress', priority: 'high', assigned_to: 'Backend Team',
+    due_date: '2026-11-25T00:00:00Z', completed_at: null, tags: ['backend', 'security'],
+    created_at: '2026-11-10T09:00:00Z', updated_at: '2026-11-19T14:00:00Z',
+  },
+  {
+    id: 'task-004', project_id: 'proj-001', title: 'Build charts and analytics',
+    description: 'Integrate recharts for financial analytics visualizations.',
+    status: 'todo', priority: 'medium', assigned_to: 'Frontend Team',
+    due_date: '2026-12-05T00:00:00Z', completed_at: null, tags: ['frontend', 'charts'],
+    created_at: '2026-11-10T09:00:00Z', updated_at: '2026-11-10T09:00:00Z',
+  },
+  {
+    id: 'task-005', project_id: 'proj-002', title: 'Product catalog design',
+    description: 'Design the product listing and detail pages.',
+    status: 'in_progress', priority: 'medium', assigned_to: 'Design Team',
+    due_date: '2026-11-30T00:00:00Z', completed_at: null, tags: ['design', 'e-commerce'],
+    created_at: '2026-10-20T09:00:00Z', updated_at: '2026-11-18T16:00:00Z',
+  },
+  {
+    id: 'task-006', project_id: 'proj-003', title: 'User acceptance testing',
+    description: 'Conduct UAT with Horizon Health clinic staff.',
+    status: 'review', priority: 'urgent', assigned_to: 'QA Team',
+    due_date: '2026-11-25T00:00:00Z', completed_at: null, tags: ['testing', 'uat'],
+    created_at: '2026-11-15T09:00:00Z', updated_at: '2026-11-20T11:00:00Z',
+  },
+]
+
+export const demoTickets: SupportTicket[] = [
+  {
+    id: 'tick-001', client_id: 'client-001', project_id: 'proj-001',
+    ticket_number: 'TKT-001', subject: 'Dashboard loading slowly on mobile',
+    description: 'The analytics dashboard takes more than 10 seconds to load on mobile devices.',
+    status: 'in_progress', priority: 'high', category: 'Performance',
+    resolved_at: null, created_at: '2026-11-18T10:00:00Z', updated_at: '2026-11-19T09:00:00Z',
+  },
+  {
+    id: 'tick-002', client_id: 'client-002', project_id: 'proj-002',
+    ticket_number: 'TKT-002', subject: 'Product images not displaying correctly',
+    description: 'Some product images appear stretched on the catalog page.',
+    status: 'open', priority: 'medium', category: 'Bug',
+    resolved_at: null, created_at: '2026-11-19T14:00:00Z', updated_at: '2026-11-19T14:00:00Z',
+  },
+  {
+    id: 'tick-003', client_id: 'client-003', project_id: 'proj-003',
+    ticket_number: 'TKT-003', subject: 'Need to add new doctor to system',
+    description: 'Please add Dr. Themba Khumalo to the appointment booking system.',
+    status: 'resolved', priority: 'low', category: 'Feature Request',
+    resolved_at: '2026-11-17T16:00:00Z', created_at: '2026-11-16T11:00:00Z', updated_at: '2026-11-17T16:00:00Z',
+  },
+]
+
+export const demoQuotations: Quotation[] = [
+  {
+    id: 'quot-001', client_id: 'client-001', requirement_id: null,
+    quote_number: 'QT-2026-001', title: 'Apex Financial Dashboard Development',
+    items: [
+      { description: 'UI/UX Design', quantity: 1, unit_price: 15000, total: 15000 },
+      { description: 'Frontend Development', quantity: 1, unit_price: 25000, total: 25000 },
+      { description: 'Backend & API Development', quantity: 1, unit_price: 20000, total: 20000 },
+      { description: 'Database Design & Setup', quantity: 1, unit_price: 8000, total: 8000 },
+      { description: 'Testing & QA', quantity: 1, unit_price: 5000, total: 5000 },
+      { description: 'Deployment & Setup', quantity: 1, unit_price: 2000, total: 2000 },
+    ],
+    subtotal: 75000, discount: 10000, tax_rate: 15, tax_amount: 9750, total: 74750,
+    valid_until: '2026-11-30T00:00:00Z', notes: 'Payment: 50% advance, 50% on completion.',
+    status: 'accepted', sent_at: '2026-10-22T10:00:00Z', accepted_at: '2026-10-25T14:00:00Z',
+    created_at: '2026-10-20T09:00:00Z', updated_at: '2026-10-25T14:00:00Z',
+  },
+  {
+    id: 'quot-002', client_id: 'client-002', requirement_id: null,
+    quote_number: 'QT-2026-002', title: 'StyleHaus E-Commerce Platform',
+    items: [
+      { description: 'UI/UX Design', quantity: 1, unit_price: 8000, total: 8000 },
+      { description: 'E-Commerce Development', quantity: 1, unit_price: 18000, total: 18000 },
+      { description: 'Payment Gateway Integration', quantity: 1, unit_price: 5000, total: 5000 },
+      { description: 'Hosting & Domain Setup', quantity: 1, unit_price: 2000, total: 2000 },
+    ],
+    subtotal: 33000, discount: 0, tax_rate: 15, tax_amount: 4950, total: 37950,
+    valid_until: '2026-10-31T00:00:00Z', notes: null,
+    status: 'sent', sent_at: '2026-10-10T10:00:00Z', accepted_at: null,
+    created_at: '2026-10-08T09:00:00Z', updated_at: '2026-10-10T10:00:00Z',
+  },
+]
+
+export const demoAgreements: Agreement[] = [
+  {
+    id: 'agr-001', client_id: 'client-001', quotation_id: 'quot-001',
+    agreement_number: 'AGR-2026-001', title: 'Apex Financial Dashboard Service Agreement',
+    content: 'This Service Agreement is entered into between CapeSecure and Apex Financial...',
+    total_value: 74750, advance_percentage: 50, advance_amount: 37375, balance_amount: 37375,
+    status: 'signed', signed_at: '2026-10-28T10:00:00Z', signature_url: null,
+    file_url: null, start_date: '2026-11-01T00:00:00Z', end_date: '2027-01-31T00:00:00Z',
+    created_at: '2026-10-26T09:00:00Z', updated_at: '2026-10-28T10:00:00Z',
+  },
+]
+
+export const demoInvoices: Invoice[] = [
+  {
+    id: 'inv-001', client_id: 'client-001', project_id: 'proj-001', payment_id: 'pay-001',
+    invoice_number: 'INV-2026-001', items: [
+      { description: 'Advance Payment - Apex Financial Dashboard (50%)', quantity: 1, unit_price: 37375, total: 37375 },
+    ],
+    subtotal: 37375, discount: 0, tax_rate: 15, tax_amount: 5606.25, total: 42981.25,
+    due_date: '2026-11-05T00:00:00Z', paid_at: '2026-11-02T10:00:00Z',
+    status: 'paid', notes: 'Thank you for your business!', file_url: null,
+    created_at: '2026-11-01T09:00:00Z', updated_at: '2026-11-02T10:00:00Z',
+  },
+  {
+    id: 'inv-002', client_id: 'client-002', project_id: 'proj-002', payment_id: null,
+    invoice_number: 'INV-2026-002', items: [
+      { description: 'StyleHaus E-Commerce - Deposit', quantity: 1, unit_price: 10000, total: 10000 },
+    ],
+    subtotal: 10000, discount: 0, tax_rate: 15, tax_amount: 1500, total: 11500,
+    due_date: '2026-10-20T00:00:00Z', paid_at: null,
+    status: 'overdue', notes: null, file_url: null,
+    created_at: '2026-10-15T09:00:00Z', updated_at: '2026-11-01T09:00:00Z',
+  },
+]
