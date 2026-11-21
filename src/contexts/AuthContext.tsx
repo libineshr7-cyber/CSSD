@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -13,7 +13,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === 'your_supabase_project_url'
+const DEMO_MODE = !isSupabaseConfigured
 
 const DEMO_USER: User = {
   id: 'demo-admin-001',
@@ -35,10 +35,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (DEMO_MODE) {
-      // Check local demo session
-      const demoSession = localStorage.getItem('capesecure_demo_session')
-      if (demoSession) {
+      // By default in demo mode, auto-login demo admin unless explicitly logged out
+      const loggedOut = localStorage.getItem('capesecure_logged_out')
+      if (!loggedOut) {
         setUser(DEMO_USER)
+      } else {
+        const demoSession = localStorage.getItem('capesecure_demo_session')
+        if (demoSession) {
+          setUser(DEMO_USER)
+        }
       }
       setLoading(false)
       return
@@ -47,6 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
+      setLoading(false)
+    }).catch((err) => {
+      console.error('Error fetching Supabase session:', err)
       setLoading(false)
     })
 
@@ -62,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     if (DEMO_MODE) {
       if (email === 'admin@capesecure.co.za' && password === 'admin123') {
+        localStorage.removeItem('capesecure_logged_out')
         localStorage.setItem('capesecure_demo_session', 'true')
         setUser(DEMO_USER)
         return { error: null }
@@ -75,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     if (DEMO_MODE) {
+      localStorage.setItem('capesecure_logged_out', 'true')
       localStorage.removeItem('capesecure_demo_session')
       setUser(null)
       return

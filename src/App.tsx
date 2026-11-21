@@ -76,13 +76,16 @@ function AppRoutes() {
   )
 }
 
+import ErrorBoundary from './components/ErrorBoundary'
+
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-          <Toaster
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+            <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,
@@ -104,5 +107,6 @@ export default function App() {
         </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
+  </ErrorBoundary>
   )
 }
