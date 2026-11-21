@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from '../lib/utils'
 import { demoQuotations, demoClients } from '../data/demoData'
 import { supabase } from '../lib/supabase'
 import { openPrintableQuotation, downloadQuotationHTML } from '../lib/pdfGenerator'
+import { sendQuotationEmail } from '../lib/emailService'
 import type { Quotation, QuotationItem, QuotationStatus, Client, PaymentMilestone } from '../types/database'
 
 // ─── Status Configuration ─────────────────────────────────────────────────────
@@ -889,7 +890,16 @@ export default function QuotationsPage() {
           quote={emailModalQuote}
           client={clients.find(c => c.id === emailModalQuote.client_id)}
           onClose={() => setEmailModalQuote(null)}
-          onSend={async (toEmail, subject) => {
+          onSend={async (toEmail, subject, messageText) => {
+            const client = clients.find(c => c.id === emailModalQuote.client_id)
+            const result = await sendQuotationEmail(emailModalQuote, client, messageText)
+
+            if (!result.success) {
+              toast.error(`Email dispatch notice: ${result.error || 'Failed to dispatch via Brevo.'}`)
+            } else {
+              toast.success(`Quotation sent via Brevo to ${toEmail} (ID: ${result.messageId?.slice(0, 12)}...)`)
+            }
+
             await (supabase as any).from('quotations').update({
               status: 'sent',
               sent_at: new Date().toISOString(),
@@ -905,7 +915,6 @@ export default function QuotationsPage() {
               email_sent_to: toEmail,
             } : q))
 
-            toast.success(`Quotation sent to ${toEmail}`)
             setEmailModalQuote(null)
           }}
         />
@@ -1417,21 +1426,27 @@ function SendQuotationEmailModal({
   quote: Quotation
   client?: Client
   onClose: () => void
-  onSend: (toEmail: string, subject: string) => void
+  onSend: (toEmail: string, subject: string, messageText: string) => Promise<void>
 }) {
   const [toEmail, setToEmail] = useState(client?.email || '')
   const [subject, setSubject] = useState(`Quotation ${quote.quote_number}: ${quote.title} — CapeSecure Solutions`)
   const [message, setMessage] = useState(
     `Dear ${client?.name || 'Client'},\n\nPlease find attached the official commercial quotation for "${quote.title}".\n\nTotal Value: ${formatCurrency(quote.total)}\nAdvance Deposit (50%): ${formatCurrency(quote.total * 0.5)}\nValid Until: ${quote.valid_until ? formatDate(quote.valid_until) : '30 days'}\n\nPlease review the terms and click to approve or request revisions.\n\nBest regards,\nCapeSecure Solutions Team`
   )
+  const [sending, setSending] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!toEmail.trim()) {
       toast.error('Recipient email is required.')
       return
     }
-    onSend(toEmail.trim(), subject.trim())
+    setSending(true)
+    try {
+      await onSend(toEmail.trim(), subject.trim(), message.trim())
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -1498,9 +1513,11 @@ function SendQuotationEmailModal({
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5"
+              disabled={sending}
+              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Send className="w-3.5 h-3.5" /> Send Quotation
+              <Send className={`w-3.5 h-3.5 ${sending ? 'animate-spin' : ''}`} />
+              {sending ? 'Sending via Brevo...' : 'Send Quotation'}
             </button>
           </div>
         </form>

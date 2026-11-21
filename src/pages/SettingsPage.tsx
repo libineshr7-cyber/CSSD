@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS, type AppRole, type NavModule } from '../types/database';
 import { DEFAULT_ROLE_PERMISSIONS } from '../lib/permissions';
+import { sendTestEmail, getBrevoApiKey, getSenderEmail, getSenderName } from '../lib/emailService';
 import {
   Settings,
   Building2,
@@ -429,75 +430,139 @@ const TeamSection: React.FC = () => {
   );
 };
 
-// ─── Email Configuration Section ──────────────────────────────────────────────
+// ─── Email Configuration Section (Brevo Integration) ──────────────────────────
 
 const EmailSection: React.FC = () => {
-  const [form, setForm] = useState({
-    host: 'smtp.sendgrid.net',
-    port: '587',
-    username: 'apikey',
-    password: '',
-    fromName: 'CapeSecure BMS',
-    fromEmail: 'no-reply@capesecure.io',
-  });
-  const [showPass, setShowPass] = useState(false);
+  const [brevoKey, setBrevoKey] = useState(getBrevoApiKey());
+  const [senderEmail, setSenderEmail] = useState(getSenderEmail());
+  const [senderName, setSenderName] = useState(getSenderName());
+  const [showKey, setShowKey] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [testing, setTesting] = useState(false);
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }));
+  const handleSave = () => {
+    localStorage.setItem('capesecure_brevo_api_key', brevoKey.trim());
+    localStorage.setItem('capesecure_brevo_sender_email', senderEmail.trim());
+    localStorage.setItem('capesecure_brevo_sender_name', senderName.trim());
+    toast.success('Brevo email configuration saved!');
+  };
 
-  const testConnection = () => {
-    toast.loading('Testing SMTP connection…', { duration: 1500 });
-    setTimeout(() => toast.success('SMTP connection successful!'), 1600);
+  const handleTestEmail = async () => {
+    if (!testEmailAddress.trim()) {
+      toast.error('Please enter a recipient email address for testing.');
+      return;
+    }
+
+    setTesting(true);
+    const toastId = toast.loading(`Sending test email to ${testEmailAddress}...`);
+
+    try {
+      // Save current key first
+      localStorage.setItem('capesecure_brevo_api_key', brevoKey.trim());
+      localStorage.setItem('capesecure_brevo_sender_email', senderEmail.trim());
+      localStorage.setItem('capesecure_brevo_sender_name', senderName.trim());
+
+      const res = await sendTestEmail(testEmailAddress.trim());
+      if (res.success) {
+        toast.success(`Test email sent successfully via Brevo! (ID: ${res.messageId?.slice(0, 10)}...)`, { id: toastId });
+      } else {
+        toast.error(`Brevo dispatch error: ${res.error || 'Check API key or sender email verification.'}`, { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`, { id: toastId });
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (
-    <div>
-      <SectionTitle title="Email Configuration" subtitle="Configure outgoing SMTP settings." />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl">
-        <FormField label="SMTP Host" htmlFor="smtpHost">
-          <input id="smtpHost" className={inputCls} value={form.host} onChange={set('host')} />
-        </FormField>
-        <FormField label="SMTP Port" htmlFor="smtpPort">
-          <input id="smtpPort" className={inputCls} value={form.port} onChange={set('port')} />
-        </FormField>
-        <FormField label="Username" htmlFor="smtpUser">
-          <input id="smtpUser" className={inputCls} value={form.username} onChange={set('username')} />
-        </FormField>
-        <FormField label="Password" htmlFor="smtpPass">
+    <div className="space-y-6 max-w-2xl">
+      <SectionTitle
+        title="Email & Transactional Dispatch (Brevo)"
+        subtitle="Manage transactional email infrastructure for quotations, service agreements, and invoices."
+      />
+
+      <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 space-y-1">
+        <div className="font-bold flex items-center gap-1.5">
+          <Mail className="w-4 h-4" /> Brevo (Sendinblue) Transactional API Connected
+        </div>
+        <p className="text-slate-400">
+          Emails for quotations, client agreements, and invoices are automatically delivered via Brevo SMTP API.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <FormField label="Brevo API Key (v3)" htmlFor="brevoApiKey">
           <div className="relative">
             <input
-              id="smtpPass"
-              type={showPass ? 'text' : 'password'}
-              className={`${inputCls} pr-10`}
-              value={form.password}
-              onChange={set('password')}
-              placeholder="••••••••"
+              id="brevoApiKey"
+              type={showKey ? 'text' : 'password'}
+              className={`${inputCls} pr-10 font-mono text-xs`}
+              value={brevoKey}
+              onChange={e => setBrevoKey(e.target.value)}
+              placeholder="xkeysib-..."
             />
             <button
               type="button"
-              onClick={() => setShowPass(s => !s)}
+              onClick={() => setShowKey(s => !s)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
             >
-              {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
         </FormField>
-        <FormField label="From Name" htmlFor="fromName">
-          <input id="fromName" className={inputCls} value={form.fromName} onChange={set('fromName')} />
-        </FormField>
-        <FormField label="From Email" htmlFor="fromEmail">
-          <input id="fromEmail" type="email" className={inputCls} value={form.fromEmail} onChange={set('fromEmail')} />
-        </FormField>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Sender Name" htmlFor="senderName">
+            <input
+              id="senderName"
+              className={inputCls}
+              value={senderName}
+              onChange={e => setSenderName(e.target.value)}
+              placeholder="CapeSecure Solutions"
+            />
+          </FormField>
+
+          <FormField label="Verified Sender Email" htmlFor="senderEmail">
+            <input
+              id="senderEmail"
+              type="email"
+              className={inputCls}
+              value={senderEmail}
+              onChange={e => setSenderEmail(e.target.value)}
+              placeholder="contact@capesecure.com"
+            />
+          </FormField>
+        </div>
+
+        <div className="pt-2">
+          <SaveButton onClick={handleSave} />
+        </div>
       </div>
-      <div className="mt-5 flex gap-3">
-        <button
-          onClick={testConnection}
-          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <RefreshCw size={15} />
-          Test Connection
-        </button>
-        <SaveButton onClick={() => toast.success('Settings saved!')} />
+
+      {/* Live Test Email Section */}
+      <div className="p-5 bg-white dark:bg-[#1E1E1E] rounded-xl border border-gray-200 dark:border-[#383838] space-y-3">
+        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+          Verify Brevo Dispatch with Test Email
+        </h4>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            placeholder="Enter your email to receive a test message..."
+            value={testEmailAddress}
+            onChange={e => setTestEmailAddress(e.target.value)}
+            className="flex-1 px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-gray-200 dark:border-[#383838] rounded-lg text-xs"
+          />
+          <button
+            type="button"
+            disabled={testing}
+            onClick={handleTestEmail}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${testing ? 'animate-spin' : ''}`} />
+            {testing ? 'Sending...' : 'Send Test'}
+          </button>
+        </div>
       </div>
     </div>
   );
