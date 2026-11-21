@@ -1,572 +1,1223 @@
-import React, { useState } from 'react'
-import toast from 'react-hot-toast'
+import { useState, useMemo, useEffect } from 'react'
 import {
-  Plus, X, FileText, ChevronDown, Check, Link as LinkIcon,
-  Calendar, DollarSign, User, Globe, Layers, Clock, Search
+  Plus, Search, Edit2, Trash2, X,
+  FileText, Download, Printer, Eye, Globe,
+  Layers, Calendar, DollarSign,
+  Building2, CheckCircle2,
+  Paperclip, Tag, ArrowRight,
+  RefreshCw
 } from 'lucide-react'
-import { demoClients } from '../data/demoData'
+import toast from 'react-hot-toast'
+import { formatCurrency, formatDate } from '../lib/utils'
+import { demoClients, demoLeads } from '../data/demoData'
+import { supabase } from '../lib/supabase'
+import { openPrintableRequirementSummary, downloadRequirementHTML } from '../lib/pdfGenerator'
+import type { Requirement, Client, Lead, RequirementReference, RequirementAttachment } from '../types/database'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Constants & Options ──────────────────────────────────────────────────────
 
-type RequirementStatus = 'draft' | 'submitted' | 'reviewed' | 'approved'
-type WebsiteType = 'brochure' | 'e-commerce' | 'portal' | 'blog' | 'custom'
-
-interface Requirement {
-  id: string
-  clientId: string
-  clientName: string
-  title: string
-  websiteType: WebsiteType
-  pages: string[]
-  features: string[]
-  designPreferences: string
-  referenceUrls: string[]
-  timeline: string
-  budgetMin: number
-  budgetMax: number
-  status: RequirementStatus
-  createdAt: string
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const ALL_FEATURES = [
-  'Contact Form', 'Blog', 'E-Commerce', 'Gallery', 'Booking System',
-  'User Login', 'Payment Gateway', 'Admin Panel', 'API Integration', 'SEO Optimization',
+const WEBSITE_TYPES = [
+  { key: 'e-commerce', label: 'E-Commerce Store' },
+  { key: 'corporate', label: 'Corporate / Business' },
+  { key: 'portal_saas', label: 'Web Portal / SaaS App' },
+  { key: 'portfolio', label: 'Portfolio / Creative' },
+  { key: 'landing_page', label: 'High-Converting Landing Page' },
+  { key: 'blog_media', label: 'Blog / Media Publication' },
+  { key: 'custom', label: 'Custom Web Application' },
 ]
 
-const WEBSITE_TYPES: WebsiteType[] = ['brochure', 'e-commerce', 'portal', 'blog', 'custom']
-
-const STATUS_TABS: { key: 'all' | RequirementStatus; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'draft', label: 'Draft' },
-  { key: 'submitted', label: 'Submitted' },
-  { key: 'reviewed', label: 'Reviewed' },
-  { key: 'approved', label: 'Approved' },
+const DEFAULT_PAGES = [
+  'Home',
+  'About Us',
+  'Services',
+  'Products / Shop',
+  'Pricing',
+  'Portfolio / Case Studies',
+  'Blog / News',
+  'Contact Us',
+  'FAQ',
+  'User Dashboard',
+  'Terms & Privacy',
 ]
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+const DEFAULT_FEATURES = [
+  'User Authentication & Roles',
+  'CMS / Blog Engine',
+  'Contact Form & Lead Capture',
+  'Online Payment Gateway',
+  'Shipping & Courier Integration',
+  'Appointment / Booking Engine',
+  'Live Chat / WhatsApp Widget',
+  'SEO Optimization & Meta tags',
+  'Analytics & Conversion Tracking',
+  'Dark / Light Theme Toggle',
+  'Multi-language Support',
+]
 
 const INITIAL_REQUIREMENTS: Requirement[] = [
   {
-    id: 'req-001', clientId: 'client-001', clientName: 'Apex Financial',
-    title: 'Financial Dashboard Requirements', websiteType: 'portal',
-    pages: ['Home', 'Dashboard', 'Reports', 'Settings'],
-    features: ['User Login', 'Admin Panel', 'API Integration', 'SEO Optimization'],
-    designPreferences: 'Professional, dark theme with blue accents.',
-    referenceUrls: ['https://stripe.com/dashboard'],
-    timeline: '3 months', budgetMin: 45000, budgetMax: 60000,
-    status: 'approved', createdAt: '2026-11-01T08:00:00Z',
+    id: 'req-001',
+    client_id: 'client-001',
+    lead_id: 'lead-004',
+    project_id: 'proj-001',
+    title: 'Financial Services Portal & Dashboard',
+    website_type: 'portal_saas',
+    business_purpose: 'Provide enterprise clients real-time financial tracking, portfolio insights, and automated statements with bank-grade security.',
+    pages: ['Home', 'About Us', 'Services', 'User Dashboard', 'Pricing', 'Terms & Privacy'],
+    features: ['User Authentication & Roles', 'Contact Form & Lead Capture', 'Online Payment Gateway', 'SEO Optimization & Meta tags', 'Analytics & Conversion Tracking'],
+    frontend_tech: 'React, TypeScript, Tailwind CSS, Vite, Recharts',
+    backend_tech: 'Node.js, Supabase Edge Functions, REST API',
+    database_tech: 'Supabase PostgreSQL with Row Level Security',
+    payment_gateway: 'Stripe',
+    shipping_integration: 'None',
+    domain_requirements: 'Client will transfer apexfin.co.za to CapeSecure Cloudflare DNS',
+    hosting_requirements: 'Vercel Edge Global Network',
+    reference_websites: [
+      { url: 'https://stripe.com/dashboard', notes: 'Loved the sidebar and analytics charts' },
+      { url: 'https://linear.app', notes: 'Super clean dark mode and typography' },
+    ],
+    design_preferences: 'High-contrast dark theme, crisp typography, clean fintech aesthetic.',
+    reference_urls: ['https://stripe.com/dashboard', 'https://linear.app'],
+    timeline: '8 Weeks',
+    budget_range: 'R 45,000 – R 60,000',
+    budget_min: 45000,
+    budget_max: 60000,
+    estimated_delivery_date: '2027-01-31',
+    additional_notes: 'Must comply with South African POPIA regulations and provide audit logs.',
+    attachments: [
+      { id: 'att-1', name: 'Brand_Guidelines_Apex.pdf', size: 2400000, type: 'pdf', uploaded_at: '2026-11-01T08:00:00Z' },
+    ],
+    status: 'approved',
+    created_at: '2026-11-01T08:00:00Z',
+    updated_at: '2026-11-15T10:00:00Z',
   },
   {
-    id: 'req-002', clientId: 'client-002', clientName: 'StyleHaus Fashion',
-    title: 'E-Commerce Store Spec', websiteType: 'e-commerce',
-    pages: ['Home', 'Shop', 'Product Detail', 'Cart', 'Checkout', 'Account'],
-    features: ['E-Commerce', 'Payment Gateway', 'User Login', 'SEO Optimization', 'Gallery'],
-    designPreferences: 'Minimal, clean look with large product imagery.',
-    referenceUrls: ['https://www.asos.com'],
-    timeline: '2 months', budgetMin: 25000, budgetMax: 35000,
-    status: 'reviewed', createdAt: '2026-10-20T09:00:00Z',
-  },
-  {
-    id: 'req-003', clientId: 'client-003', clientName: 'Horizon Health Clinic',
-    title: 'Patient Portal Requirements', websiteType: 'portal',
-    pages: ['Home', 'Appointments', 'Records', 'Doctors', 'Telemedicine'],
-    features: ['Booking System', 'User Login', 'Admin Panel', 'Contact Form'],
-    designPreferences: 'Clean, calming healthcare aesthetic — blues and greens.',
-    referenceUrls: [],
-    timeline: '4 months', budgetMin: 50000, budgetMax: 70000,
-    status: 'submitted', createdAt: '2026-09-10T10:00:00Z',
-  },
-  {
-    id: 'req-004', clientId: 'client-004', clientName: 'Pinnacle Properties',
-    title: 'Real Estate Listings Site', websiteType: 'custom',
-    pages: ['Home', 'Listings', 'Property Detail', 'Agents', 'Contact'],
-    features: ['Gallery', 'Contact Form', 'SEO Optimization', 'API Integration'],
-    designPreferences: 'Luxury, premium feel. Dark backgrounds with gold accents.',
-    referenceUrls: ['https://www.pam.co.za'],
-    timeline: '3 months', budgetMin: 30000, budgetMax: 45000,
-    status: 'draft', createdAt: '2026-07-20T08:00:00Z',
+    id: 'req-002',
+    client_id: 'client-002',
+    lead_id: null,
+    project_id: null,
+    title: 'Fashion E-Commerce Flagship Store',
+    website_type: 'e-commerce',
+    business_purpose: 'Direct-to-consumer premium apparel store with automated inventory sync and instant mobile checkout.',
+    pages: ['Home', 'Products / Shop', 'About Us', 'Contact Us', 'FAQ', 'Terms & Privacy'],
+    features: ['Online Payment Gateway', 'Shipping & Courier Integration', 'CMS / Blog Engine', 'SEO Optimization & Meta tags', 'Live Chat / WhatsApp Widget'],
+    frontend_tech: 'React, Tailwind CSS, Framer Motion',
+    backend_tech: 'Node.js & Supabase Database Webhooks',
+    database_tech: 'PostgreSQL',
+    payment_gateway: 'PayFast / Stripe',
+    shipping_integration: 'Shiprocket / Courier Guy',
+    domain_requirements: 'CapeSecure to register stylehaus.co.za',
+    hosting_requirements: 'CapeSecure Managed Cloud',
+    reference_websites: [
+      { url: 'https://asos.com', notes: 'Product card hover effects and checkout UX' }
+    ],
+    design_preferences: 'Minimalist editorial layout, high-res photography focus, elegant serif headings.',
+    reference_urls: ['https://asos.com'],
+    timeline: '6 Weeks',
+    budget_range: 'R 25,000 – R 35,000',
+    budget_min: 25000,
+    budget_max: 35000,
+    estimated_delivery_date: '2026-12-20',
+    additional_notes: 'Include Instagram feed integration and discount coupons.',
+    attachments: [],
+    status: 'reviewed',
+    created_at: '2026-10-20T09:00:00Z',
+    updated_at: '2026-11-05T14:00:00Z',
   },
 ]
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function statusColor(status: RequirementStatus) {
-  switch (status) {
-    case 'draft': return 'bg-gray-100 text-gray-700'
-    case 'submitted': return 'bg-blue-100 text-blue-700'
-    case 'reviewed': return 'bg-yellow-100 text-yellow-700'
-    case 'approved': return 'bg-green-100 text-green-700'
-  }
-}
-
-function fmt(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-// ─── Empty State ─────────────────────────────────────────────────────────────
-
-function EmptyState({ filtered }: { filtered: boolean }) {
-  return (
-    <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center mb-4">
-        <FileText className="w-10 h-10 text-blue-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-700 mb-1">
-        {filtered ? 'No requirements match this filter' : 'No requirements yet'}
-      </h3>
-      <p className="text-sm text-gray-500 max-w-xs">
-        {filtered
-          ? 'Try a different status tab or add a new requirement.'
-          : 'Start by clicking "New Requirement" to capture a client\'s website needs.'}
-      </p>
-    </div>
-  )
-}
-
-// ─── Requirement Card ─────────────────────────────────────────────────────────
-
-function RequirementCard({ req, onView }: { req: Requirement; onView: (r: Requirement) => void }) {
-  return (
-    <div
-      className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col gap-3 cursor-pointer"
-      onClick={() => onView(req)}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold text-gray-800 leading-tight">{req.title}</h3>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${statusColor(req.status)}`}>
-          {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-        <User className="w-3.5 h-3.5" />
-        <span>{req.clientName}</span>
-      </div>
-
-      <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-        <span className="flex items-center gap-1">
-          <Globe className="w-3.5 h-3.5" />
-          <span className="capitalize">{req.websiteType}</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <Layers className="w-3.5 h-3.5" />
-          {req.pages.length} pages
-        </span>
-        <span className="flex items-center gap-1">
-          <Check className="w-3.5 h-3.5" />
-          {req.features.length} features
-        </span>
-      </div>
-
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="flex items-center gap-1 text-gray-500">
-          <Clock className="w-3.5 h-3.5" />
-          {req.timeline}
-        </span>
-        <span className="flex items-center gap-1 text-gray-500">
-          <DollarSign className="w-3.5 h-3.5" />
-          R{req.budgetMin.toLocaleString()} – R{req.budgetMax.toLocaleString()}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1 text-xs text-gray-400 mt-auto pt-2 border-t border-gray-100">
-        <Calendar className="w-3.5 h-3.5" />
-        {fmt(req.createdAt)}
-      </div>
-    </div>
-  )
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function RequirementsPage() {
   const [requirements, setRequirements] = useState<Requirement[]>(INITIAL_REQUIREMENTS)
-  const [activeTab, setActiveTab] = useState<'all' | RequirementStatus>('all')
+  const [clients, setClients] = useState<Client[]>(demoClients)
+  const [leads, setLeads] = useState<Lead[]>(demoLeads)
+  const [loading, setLoading] = useState(false)
+
+  // Filters & State
   const [search, setSearch] = useState('')
-  const [showModal, setShowModal] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [clientFilter, setClientFilter] = useState<string>('all')
+  const [page, setPage] = useState(1)
+  const pageSize = 6
 
-  // Form state
-  const [form, setForm] = useState({
-    clientId: '',
-    title: '',
-    websiteType: '' as WebsiteType | '',
-    pagesInput: '',
-    pages: [] as string[],
-    features: [] as string[],
-    designPreferences: '',
-    referenceUrls: [''],
-    timeline: '',
-    budgetMin: '',
-    budgetMax: '',
-    status: 'draft' as 'draft' | 'submitted',
-  })
+  // Modals
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editReq, setEditReq] = useState<Requirement | null>(null)
+  const [deleteConfirmReq, setDeleteConfirmReq] = useState<Requirement | null>(null)
+  const [previewReq, setPreviewReq] = useState<Requirement | null>(null)
 
-  // Filtered list
-  const filtered = requirements.filter(r => {
-    const matchTab = activeTab === 'all' || r.status === activeTab
-    const matchSearch = search === '' ||
-      r.title.toLowerCase().includes(search.toLowerCase()) ||
-      r.clientName.toLowerCase().includes(search.toLowerCase())
-    return matchTab && matchSearch
-  })
+  // Load from Supabase
+  const loadRequirements = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await (supabase as any)
+        .from('requirements')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-  // Page chip handling
-  function addPageChip() {
-    const trimmed = form.pagesInput.trim()
-    if (!trimmed) return
-    const newPages = trimmed.split(',').map(p => p.trim()).filter(p => p && !form.pages.includes(p))
-    setForm(f => ({ ...f, pages: [...f.pages, ...newPages], pagesInput: '' }))
+      if (!error && data && data.length > 0) {
+        setRequirements(data as Requirement[])
+      }
+    } catch (_) {}
+
+    try {
+      const { data: clientData } = await (supabase as any).from('clients').select('*')
+      if (clientData && clientData.length > 0) setClients(clientData as Client[])
+      const { data: leadData } = await (supabase as any).from('leads').select('*')
+      if (leadData && leadData.length > 0) setLeads(leadData as Lead[])
+    } catch (_) {}
+    setLoading(false)
   }
 
-  function removePageChip(page: string) {
-    setForm(f => ({ ...f, pages: f.pages.filter(p => p !== page) }))
-  }
+  useEffect(() => {
+    loadRequirements()
+  }, [])
 
-  function toggleFeature(feature: string) {
-    setForm(f => ({
-      ...f,
-      features: f.features.includes(feature)
-        ? f.features.filter(x => x !== feature)
-        : [...f.features, feature],
-    }))
-  }
+  // Filtered Requirements
+  const filtered = useMemo(() => {
+    return requirements.filter(r => {
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false
+      if (typeFilter !== 'all' && r.website_type !== typeFilter) return false
+      if (clientFilter !== 'all' && r.client_id !== clientFilter) return false
 
-  function addRefUrl() {
-    setForm(f => ({ ...f, referenceUrls: [...f.referenceUrls, ''] }))
-  }
-
-  function updateRefUrl(idx: number, val: string) {
-    setForm(f => {
-      const updated = [...f.referenceUrls]
-      updated[idx] = val
-      return { ...f, referenceUrls: updated }
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        const client = clients.find(c => c.id === r.client_id)
+        const matchTitle = r.title.toLowerCase().includes(q)
+        const matchClient = (client?.name || '').toLowerCase().includes(q)
+        const matchCompany = (client?.business_name || client?.company || '').toLowerCase().includes(q)
+        const matchPurpose = (r.business_purpose || '').toLowerCase().includes(q)
+        if (!matchTitle && !matchClient && !matchCompany && !matchPurpose) return false
+      }
+      return true
     })
-  }
+  }, [requirements, search, statusFilter, typeFilter, clientFilter, clients])
 
-  function removeRefUrl(idx: number) {
-    setForm(f => ({ ...f, referenceUrls: f.referenceUrls.filter((_, i) => i !== idx) }))
-  }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
 
-  function resetForm() {
-    setForm({
-      clientId: '', title: '', websiteType: '', pagesInput: '', pages: [],
-      features: [], designPreferences: '', referenceUrls: [''],
-      timeline: '', budgetMin: '', budgetMax: '', status: 'draft',
-    })
-  }
+  // ─── Actions ────────────────────────────────────────────────────────────────
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.clientId || !form.title || !form.websiteType) {
-      toast.error('Please fill in all required fields.')
+  const handleSaveRequirement = async (formData: Partial<Requirement>, isEdit: boolean) => {
+    if (!formData.title?.trim() || !formData.client_id) {
+      toast.error('Requirement title and associated client are required.')
       return
     }
-    const client = demoClients.find(c => c.id === form.clientId)
-    const newReq: Requirement = {
-      id: `req-${Date.now()}`,
-      clientId: form.clientId,
-      clientName: client?.company || client?.name || '',
-      title: form.title,
-      websiteType: form.websiteType as WebsiteType,
-      pages: form.pages,
-      features: form.features,
-      designPreferences: form.designPreferences,
-      referenceUrls: form.referenceUrls.filter(u => u.trim()),
-      timeline: form.timeline,
-      budgetMin: Number(form.budgetMin) || 0,
-      budgetMax: Number(form.budgetMax) || 0,
-      status: form.status,
-      createdAt: new Date().toISOString(),
+
+    try {
+      if (isEdit && editReq) {
+        const updated: Requirement = {
+          ...editReq,
+          ...formData,
+          updated_at: new Date().toISOString(),
+        }
+
+        await (supabase as any)
+          .from('requirements')
+          .update(formData)
+          .eq('id', editReq.id)
+
+        setRequirements(prev => prev.map(r => r.id === editReq.id ? updated : r))
+        if (previewReq?.id === editReq.id) setPreviewReq(updated)
+        toast.success('Requirement specification updated')
+        setEditReq(null)
+      } else {
+        const newReq: Requirement = {
+          id: `req-${Date.now()}`,
+          client_id: formData.client_id,
+          lead_id: formData.lead_id || null,
+          project_id: null,
+          title: formData.title.trim(),
+          website_type: formData.website_type || 'corporate',
+          business_purpose: formData.business_purpose || null,
+          pages: formData.pages || [],
+          features: formData.features || [],
+          frontend_tech: formData.frontend_tech || null,
+          backend_tech: formData.backend_tech || null,
+          database_tech: formData.database_tech || null,
+          payment_gateway: formData.payment_gateway || null,
+          shipping_integration: formData.shipping_integration || null,
+          domain_requirements: formData.domain_requirements || null,
+          hosting_requirements: formData.hosting_requirements || null,
+          design_preferences: formData.design_preferences || null,
+          reference_urls: (formData.reference_websites || []).map(r => r.url),
+          reference_websites: formData.reference_websites || [],
+          timeline: formData.timeline || null,
+          budget_min: formData.budget_min ? Number(formData.budget_min) : null,
+          budget_max: formData.budget_max ? Number(formData.budget_max) : null,
+          budget_range: formData.budget_min && formData.budget_max
+            ? `${formatCurrency(formData.budget_min)} – ${formatCurrency(formData.budget_max)}`
+            : null,
+          estimated_delivery_date: formData.estimated_delivery_date || null,
+          additional_notes: formData.additional_notes || null,
+          attachments: formData.attachments || [],
+          status: (formData.status as any) || 'draft',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
+        try {
+          const { data } = await (supabase as any)
+            .from('requirements')
+            .insert({
+              client_id: newReq.client_id,
+              lead_id: newReq.lead_id,
+              title: newReq.title,
+              website_type: newReq.website_type,
+              business_purpose: newReq.business_purpose,
+              pages: newReq.pages,
+              features: newReq.features,
+              frontend_tech: newReq.frontend_tech,
+              backend_tech: newReq.backend_tech,
+              database_tech: newReq.database_tech,
+              payment_gateway: newReq.payment_gateway,
+              shipping_integration: newReq.shipping_integration,
+              domain_requirements: newReq.domain_requirements,
+              hosting_requirements: newReq.hosting_requirements,
+              design_preferences: newReq.design_preferences,
+              reference_urls: newReq.reference_urls,
+              reference_websites: newReq.reference_websites,
+              timeline: newReq.timeline,
+              budget_min: newReq.budget_min,
+              budget_max: newReq.budget_max,
+              budget_range: newReq.budget_range,
+              estimated_delivery_date: newReq.estimated_delivery_date,
+              additional_notes: newReq.additional_notes,
+              attachments: newReq.attachments,
+              status: newReq.status,
+            })
+            .select()
+            .single()
+
+          if (data) newReq.id = data.id
+        } catch (_) {}
+
+        setRequirements(prev => [newReq, ...prev])
+        toast.success('Requirement specification created!')
+        setCreateModalOpen(false)
+      }
+    } catch (err: any) {
+      toast.error('Save failed: ' + err.message)
     }
-    setRequirements(prev => [newReq, ...prev])
-    toast.success('Requirement added successfully!')
-    setShowModal(false)
-    resetForm()
   }
 
+  const handleDeleteReq = async (id: string) => {
+    try {
+      await (supabase as any).from('requirements').delete().eq('id', id)
+      setRequirements(prev => prev.filter(r => r.id !== id))
+      if (previewReq?.id === id) setPreviewReq(null)
+      toast.success('Requirement removed')
+      setDeleteConfirmReq(null)
+    } catch (_) {
+      toast.error('Could not delete requirement')
+    }
+  }
+
+  const handleStatusChange = async (id: string, newStatus: Requirement['status']) => {
+    try {
+      await (supabase as any)
+        .from('requirements')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', id)
+
+      setRequirements(prev => prev.map(r => r.id === id ? { ...r, status: newStatus } : r))
+      if (previewReq?.id === id) setPreviewReq(prev => prev ? { ...prev, status: newStatus } : null)
+      toast.success(`Requirement marked as ${newStatus.toUpperCase()}`)
+    } catch (_) {
+      toast.error('Status update failed')
+    }
+  }
+
+  const handlePrintPDF = (req: Requirement) => {
+    const client = clients.find(c => c.id === req.client_id)
+    const lead = leads.find(l => l.id === req.lead_id)
+    openPrintableRequirementSummary({ requirement: req, client, lead })
+  }
+
+  const handleDownloadDoc = (req: Requirement) => {
+    const client = clients.find(c => c.id === req.client_id)
+    const lead = leads.find(l => l.id === req.lead_id)
+    downloadRequirementHTML({ requirement: req, client, lead })
+    toast.success('Downloaded requirement summary specification!')
+  }
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Requirements</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Capture and manage client website requirements</p>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Client Requirement Collection</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Capture detailed website scope, frontend/backend architecture, page hierarchy, features, and generate printable summary PDFs.
+          </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> New Requirement
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadRequirements}
+            className="p-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+            title="Refresh requirements"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="px-3 py-1.5 bg-[#0D99FF] hover:bg-[#0D99FF]/90 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Requirement Brief
+          </button>
+        </div>
       </div>
 
-      {/* Filters row */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-lg flex-wrap">
-          {STATUS_TABS.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                activeTab === tab.key
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
+      {/* Filter and Search Bar */}
+      <div className="p-3 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by requirement title, client name, purpose..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              className="w-full pl-9 pr-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0D99FF]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Website Type Filter */}
+            <select
+              value={typeFilter}
+              onChange={e => { setTypeFilter(e.target.value); setPage(1) }}
+              className="px-2.5 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
             >
-              {tab.label}
-              <span className="ml-1.5 text-xs text-gray-400">
-                ({tab.key === 'all' ? requirements.length : requirements.filter(r => r.status === tab.key).length})
-              </span>
-            </button>
-          ))}
+              <option value="all">All Website Types</option>
+              {WEBSITE_TYPES.map(t => (
+                <option key={t.key} value={t.key}>{t.label}</option>
+              ))}
+            </select>
+
+            {/* Client Filter */}
+            <select
+              value={clientFilter}
+              onChange={e => { setClientFilter(e.target.value); setPage(1) }}
+              className="px-2.5 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none max-w-[160px] truncate"
+            >
+              <option value="all">All Clients</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.name} ({c.client_code})</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="relative ml-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search requirements…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-          />
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-[#E5E5E5] dark:border-[#2D2D2D] pt-2">
+          {['all', 'draft', 'submitted', 'reviewed', 'approved'].map(st => {
+            const count = st === 'all' ? requirements.length : requirements.filter(r => r.status === st).length
+            return (
+              <button
+                key={st}
+                onClick={() => { setStatusFilter(st); setPage(1) }}
+                className={`px-2.5 py-1 rounded-md font-semibold capitalize transition-colors whitespace-nowrap ${
+                  statusFilter === st
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#282828]'
+                }`}
+              >
+                {st} ({count})
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.length === 0
-          ? <EmptyState filtered={activeTab !== 'all' || search !== ''} />
-          : filtered.map(req => (
-            <RequirementCard key={req.id} req={req} onView={() => {}} />
-          ))}
+      {/* Requirements Cards Grid */}
+      {paginated.length === 0 ? (
+        <div className="py-20 text-center bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <FileText className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">No requirement documents found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+            Create a detailed website specification brief for one of your clients to get started.
+          </p>
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="mt-4 px-3 py-1.5 bg-[#0D99FF] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" /> Create Requirement Brief
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {paginated.map(req => {
+            const client = clients.find(c => c.id === req.client_id)
+            const typeObj = WEBSITE_TYPES.find(t => t.key === req.website_type)
+
+            return (
+              <div
+                key={req.id}
+                className="p-5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl space-y-4 hover:border-[#0D99FF]/40 transition-colors shadow-xs flex flex-col justify-between"
+              >
+                {/* Header */}
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#282828] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#383838]">
+                          {client?.client_code || 'CS-CLIENT-XXXX'}
+                        </span>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{req.title}</h3>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
+                        <Building2 className="w-3 h-3 text-slate-400" />
+                        {client?.business_name || client?.name || 'Client Account'} • {typeObj?.label || req.website_type}
+                      </p>
+                    </div>
+
+                    {/* Status Selector */}
+                    <select
+                      value={req.status}
+                      onChange={e => handleStatusChange(req.id, e.target.value as any)}
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full border uppercase cursor-pointer focus:outline-none ${
+                        req.status === 'approved' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                        req.status === 'reviewed' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                        req.status === 'submitted' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
+                        'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                      }`}
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="submitted">Submitted</option>
+                      <option value="reviewed">Reviewed</option>
+                      <option value="approved">Approved</option>
+                    </select>
+                  </div>
+
+                  {/* Business Purpose */}
+                  {req.business_purpose && (
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-3 line-clamp-2 bg-[#F9FAFB] dark:bg-[#252525] p-2.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838]">
+                      {req.business_purpose}
+                    </p>
+                  )}
+
+                  {/* Spec Highlights Grid */}
+                  <div className="grid grid-cols-2 gap-2 mt-3 text-[11px]">
+                    <div className="p-2 rounded bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-[#333333]">
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Pages Required</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {req.pages?.length || 0} Pages ({req.pages?.slice(0, 2).join(', ')}...)
+                      </span>
+                    </div>
+
+                    <div className="p-2 rounded bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-[#333333]">
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Budget & Timeline</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {req.budget_range || (req.budget_min ? formatCurrency(req.budget_min) : 'TBD')}
+                      </span>
+                    </div>
+
+                    <div className="p-2 rounded bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-[#333333]">
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Payment / Shipping</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {req.payment_gateway || 'None'} • {req.shipping_integration || 'None'}
+                      </span>
+                    </div>
+
+                    <div className="p-2 rounded bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-[#333333]">
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Delivery Target</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {req.estimated_delivery_date ? formatDate(req.estimated_delivery_date) : (req.timeline || '4–6 wks')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Actions */}
+                <div className="flex items-center justify-between pt-3 border-t border-[#E5E5E5] dark:border-[#2D2D2D] gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handlePrintPDF(req)}
+                      title="Print or Save as PDF"
+                      className="px-2.5 py-1 bg-[#0D99FF] hover:bg-[#0D99FF]/90 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-xs"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Print Summary PDF
+                    </button>
+
+                    <button
+                      onClick={() => handleDownloadDoc(req)}
+                      title="Download Specification Document"
+                      className="p-1.5 border border-[#E5E5E5] dark:border-[#383838] bg-[#F9FAFB] dark:bg-[#252525] text-slate-600 dark:text-slate-300 rounded hover:text-slate-900 dark:hover:text-slate-100"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPreviewReq(req)}
+                      title="View Full Specification"
+                      className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setEditReq(req)}
+                      title="Edit Specification"
+                      className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirmReq(req)}
+                      title="Delete Specification"
+                      className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Pagination Footer */}
+      <div className="py-2.5 px-4 border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl bg-white dark:bg-[#1E1E1E] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+        <div>
+          Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length} briefs
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            disabled={page <= 1}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            className="px-2.5 py-1 rounded border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="font-semibold px-2">{page} / {totalPages}</span>
+          <button
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            className="px-2.5 py-1 rounded border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
       </div>
 
-      {/* ── Modal ── */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-8">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800">New Requirement</h2>
-              <button onClick={() => { setShowModal(false); resetForm() }} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
+      {/* ─── CREATE / EDIT REQUIREMENT FORM MODAL ────────────────────────────── */}
+      {(createModalOpen || editReq) && (
+        <RequirementFormModal
+          open={createModalOpen || !!editReq}
+          initial={editReq || undefined}
+          clients={clients}
+          leads={leads}
+          onClose={() => { setCreateModalOpen(false); setEditReq(null) }}
+          onSave={data => handleSaveRequirement(data, !!editReq)}
+        />
+      )}
+
+      {/* ─── REQUIREMENT DETAIL DRAWER ────────────────────────────────────────── */}
+      {previewReq && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs" onClick={() => setPreviewReq(null)}>
+          <div
+            className="w-full max-w-xl h-full bg-white dark:bg-[#1E1E1E] border-l border-[#E5E5E5] dark:border-[#2D2D2D] shadow-2xl p-6 overflow-y-auto space-y-5 text-xs"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start border-b border-[#E5E5E5] dark:border-[#2D2D2D] pb-3">
+              <div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-500 uppercase">
+                  {previewReq.status}
+                </span>
+                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-1">{previewReq.title}</h2>
+              </div>
+              <button onClick={() => setPreviewReq(null)} className="text-slate-400 hover:text-slate-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              {/* Client + Title */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <select
-                      value={form.clientId}
-                      onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="">Select client…</option>
-                      {demoClients.map(c => (
-                        <option key={c.id} value={c.id}>{c.company || c.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    value={form.title}
-                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                    placeholder="e.g. E-Commerce Platform Requirements"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handlePrintPDF(previewReq)}
+                className="flex-1 py-2 px-3 bg-[#0D99FF] text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print Summary PDF
+              </button>
+              <button
+                onClick={() => handleDownloadDoc(previewReq)}
+                className="py-2 px-3 border border-[#E5E5E5] dark:border-[#383838] bg-[#F9FAFB] dark:bg-[#252525] rounded-lg font-medium flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Download
+              </button>
+            </div>
 
-              {/* Website Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Website Type <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <select
-                    value={form.websiteType}
-                    onChange={e => setForm(f => ({ ...f, websiteType: e.target.value as WebsiteType }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Select type…</option>
-                    {WEBSITE_TYPES.map(t => (
-                      <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
+            <div className="p-3 bg-[#F9FAFB] dark:bg-[#252525] rounded-lg border border-[#E5E5E5] dark:border-[#383838] space-y-1">
+              <div><strong>Business Purpose:</strong> {previewReq.business_purpose || 'N/A'}</div>
+              <div><strong>Website Type:</strong> {previewReq.website_type}</div>
+              <div><strong>Budget:</strong> {previewReq.budget_range || (previewReq.budget_min ? formatCurrency(previewReq.budget_min) : 'TBD')}</div>
+              <div><strong>Estimated Delivery:</strong> {previewReq.estimated_delivery_date || previewReq.timeline || 'TBD'}</div>
+            </div>
 
-              {/* Pages */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pages</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={form.pagesInput}
-                    onChange={e => setForm(f => ({ ...f, pagesInput: e.target.value }))}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPageChip() } }}
-                    placeholder="Home, About, Contact (comma-separated)"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button type="button" onClick={addPageChip} className="px-3 py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200">
-                    Add
-                  </button>
-                </div>
-                {form.pages.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {form.pages.map(p => (
-                      <span key={p} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs rounded-full">
-                        {p}
-                        <button type="button" onClick={() => removePageChip(p)}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Features */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Features</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {ALL_FEATURES.map(feature => (
-                    <label key={feature} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.features.includes(feature)}
-                        onChange={() => toggleFeature(feature)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      {feature}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Design Preferences */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Design Preferences</label>
-                <textarea
-                  value={form.designPreferences}
-                  onChange={e => setForm(f => ({ ...f, designPreferences: e.target.value }))}
-                  rows={3}
-                  placeholder="Describe the visual style, color palette, tone, or reference brand examples…"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
-              {/* Reference URLs */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reference URLs</label>
-                {form.referenceUrls.map((url, idx) => (
-                  <div key={idx} className="flex gap-2 mb-2">
-                    <div className="relative flex-1">
-                      <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="url"
-                        value={url}
-                        onChange={e => updateRefUrl(idx, e.target.value)}
-                        placeholder="https://example.com"
-                        className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    {form.referenceUrls.length > 1 && (
-                      <button type="button" onClick={() => removeRefUrl(idx)} className="text-gray-400 hover:text-red-500">
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+            <div>
+              <h4 className="font-bold text-slate-900 dark:text-slate-100 mb-2 uppercase text-[11px]">Pages Requested</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {(previewReq.pages || []).map(p => (
+                  <span key={p} className="px-2 py-0.5 bg-slate-100 dark:bg-[#282828] rounded border border-slate-200 dark:border-[#383838]">
+                    {p}
+                  </span>
                 ))}
-                <button type="button" onClick={addRefUrl} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                  <Plus className="w-3.5 h-3.5" /> Add another URL
-                </button>
               </div>
+            </div>
 
-              {/* Timeline + Budget */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Timeline</label>
-                  <input
-                    type="text"
-                    value={form.timeline}
-                    onChange={e => setForm(f => ({ ...f, timeline: e.target.value }))}
-                    placeholder="e.g. 3 months"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Budget Min (R)</label>
-                  <input
-                    type="number"
-                    value={form.budgetMin}
-                    onChange={e => setForm(f => ({ ...f, budgetMin: e.target.value }))}
-                    placeholder="25000"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Budget Max (R)</label>
-                  <input
-                    type="number"
-                    value={form.budgetMax}
-                    onChange={e => setForm(f => ({ ...f, budgetMax: e.target.value }))}
-                    placeholder="40000"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+            <div>
+              <h4 className="font-bold text-slate-900 dark:text-slate-100 mb-2 uppercase text-[11px]">Key Features</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {(previewReq.features || []).map(f => (
+                  <span key={f} className="px-2 py-0.5 bg-blue-500/10 text-blue-500 rounded border border-blue-500/20">
+                    {f}
+                  </span>
+                ))}
               </div>
+            </div>
 
-              {/* Status */}
+            <div className="space-y-1">
+              <h4 className="font-bold text-slate-900 dark:text-slate-100 uppercase text-[11px]">Technical Architecture</h4>
+              <div><strong>Frontend:</strong> {previewReq.frontend_tech || 'React / Vite / Tailwind'}</div>
+              <div><strong>Backend:</strong> {previewReq.backend_tech || 'Node.js / Supabase'}</div>
+              <div><strong>Database:</strong> {previewReq.database_tech || 'Supabase PostgreSQL'}</div>
+              <div><strong>Payment:</strong> {previewReq.payment_gateway || 'None'}</div>
+              <div><strong>Shipping:</strong> {previewReq.shipping_integration || 'None'}</div>
+              <div><strong>Domain:</strong> {previewReq.domain_requirements || 'Standard'}</div>
+              <div><strong>Hosting:</strong> {previewReq.hosting_requirements || 'Vercel / Cloudflare'}</div>
+            </div>
+
+            {previewReq.reference_websites && previewReq.reference_websites.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <div className="flex gap-3">
-                  {(['draft', 'submitted'] as const).map(s => (
-                    <label key={s} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="status"
-                        value={s}
-                        checked={form.status === s}
-                        onChange={() => setForm(f => ({ ...f, status: s }))}
-                        className="text-blue-600 focus:ring-blue-500"
-                      />
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
-                    </label>
+                <h4 className="font-bold text-slate-900 dark:text-slate-100 uppercase text-[11px]">Reference Sites</h4>
+                <ul className="list-disc pl-4 space-y-1">
+                  {previewReq.reference_websites.map((rw, i) => (
+                    <li key={i}>
+                      <a href={rw.url} target="_blank" rel="noreferrer" className="text-blue-500 underline">{rw.url}</a>
+                      {rw.notes && <span className="text-slate-400 ml-1">({rw.notes})</span>}
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
-
-              {/* Footer */}
-              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => { setShowModal(false); resetForm() }}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Save Requirement
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
+
+      {/* ─── DELETE CONFIRM MODAL ────────────────────────────────────────────── */}
+      {deleteConfirmReq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-white dark:bg-[#1E1E1E] rounded-xl border border-[#E5E5E5] dark:border-[#383838] p-5 space-y-3 shadow-xl">
+            <h3 className="text-sm font-bold text-red-500">Delete Requirement Specification?</h3>
+            <p className="text-xs text-slate-500">
+              Are you sure you want to remove <strong>"{deleteConfirmReq.title}"</strong>?
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setDeleteConfirmReq(null)}
+                className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] text-xs font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteReq(deleteConfirmReq.id)}
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── REQUIREMENT FORM MODAL (COMPREHENSIVE SPECS) ─────────────────────────────
+
+function RequirementFormModal({
+  open,
+  initial,
+  clients,
+  leads,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  initial?: Requirement
+  clients: Client[]
+  leads: Lead[]
+  onClose: () => void
+  onSave: (data: Partial<Requirement>) => void
+}) {
+  const [form, setForm] = useState({
+    title: initial?.title || '',
+    client_id: initial?.client_id || (clients[0]?.id || ''),
+    lead_id: initial?.lead_id || '',
+    website_type: initial?.website_type || 'corporate',
+    business_purpose: initial?.business_purpose || '',
+    pages: initial?.pages || ['Home', 'About Us', 'Services', 'Contact Us'],
+    features: initial?.features || ['Contact Form & Lead Capture', 'SEO Optimization & Meta tags'],
+    frontend_tech: initial?.frontend_tech || 'React, TypeScript, Tailwind CSS',
+    backend_tech: initial?.backend_tech || 'Supabase Edge Functions / Node.js',
+    database_tech: initial?.database_tech || 'Supabase PostgreSQL',
+    payment_gateway: initial?.payment_gateway || 'None',
+    shipping_integration: initial?.shipping_integration || 'None',
+    domain_requirements: initial?.domain_requirements || 'Client has existing domain',
+    hosting_requirements: initial?.hosting_requirements || 'Vercel Edge Global Network',
+    reference_websites: initial?.reference_websites || [{ url: '', notes: '' }],
+    design_preferences: initial?.design_preferences || '',
+    timeline: initial?.timeline || '4–6 Weeks',
+    budget_min: initial?.budget_min ? String(initial.budget_min) : '',
+    budget_max: initial?.budget_max ? String(initial.budget_max) : '',
+    estimated_delivery_date: initial?.estimated_delivery_date || '',
+    additional_notes: initial?.additional_notes || '',
+    status: (initial?.status || 'draft') as Requirement['status'],
+  })
+
+  const [customPage, setCustomPage] = useState('')
+  const [customFeature, setCustomFeature] = useState('')
+  const [newRefUrl, setNewRefUrl] = useState('')
+  const [newRefNote, setNewRefNote] = useState('')
+
+  if (!open) return null
+
+  const togglePage = (pageName: string) => {
+    if (form.pages.includes(pageName)) {
+      setForm({ ...form, pages: form.pages.filter(p => p !== pageName) })
+    } else {
+      setForm({ ...form, pages: [...form.pages, pageName] })
+    }
+  }
+
+  const addCustomPage = () => {
+    if (!customPage.trim()) return
+    if (!form.pages.includes(customPage.trim())) {
+      setForm({ ...form, pages: [...form.pages, customPage.trim()] })
+    }
+    setCustomPage('')
+  }
+
+  const toggleFeature = (featName: string) => {
+    if (form.features.includes(featName)) {
+      setForm({ ...form, features: form.features.filter(f => f !== featName) })
+    } else {
+      setForm({ ...form, features: [...form.features, featName] })
+    }
+  }
+
+  const addCustomFeature = () => {
+    if (!customFeature.trim()) return
+    if (!form.features.includes(customFeature.trim())) {
+      setForm({ ...form, features: [...form.features, customFeature.trim()] })
+    }
+    setCustomFeature('')
+  }
+
+  const addReferenceWebsite = () => {
+    if (!newRefUrl.trim()) return
+    setForm({
+      ...form,
+      reference_websites: [...form.reference_websites.filter(r => r.url), { url: newRefUrl.trim(), notes: newRefNote.trim() }],
+    })
+    setNewRefUrl('')
+    setNewRefNote('')
+  }
+
+  const removeReferenceWebsite = (index: number) => {
+    setForm({
+      ...form,
+      reference_websites: form.reference_websites.filter((_, i) => i !== index),
+    })
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave({
+      ...form,
+      budget_min: form.budget_min ? Number(form.budget_min) : null,
+      budget_max: form.budget_max ? Number(form.budget_max) : null,
+      reference_websites: form.reference_websites.filter(r => r.url.trim()),
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" onClick={onClose}>
+      <div
+        className="w-full max-w-3xl bg-white dark:bg-[#1E1E1E] rounded-xl border border-[#E5E5E5] dark:border-[#383838] p-6 space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#2D2D2D] pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              {initial ? 'Edit Requirement Specification' : 'New Client Requirement Brief'}
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Comprehensive scope document for frontend, backend, payment gateway, domain, and page structure.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          {/* Section 1: Overview */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block text-slate-500 mb-1">Requirement Title *</label>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Modern E-Commerce Platform with WhatsApp Ordering"
+                value={form.title}
+                onChange={e => setForm({ ...form, title: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Associated Client *</label>
+              <select
+                required
+                value={form.client_id}
+                onChange={e => setForm({ ...form, client_id: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              >
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.client_code})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-500 mb-1">Website Type *</label>
+              <select
+                value={form.website_type}
+                onChange={e => setForm({ ...form, website_type: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              >
+                {WEBSITE_TYPES.map(t => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Specification Status</label>
+              <select
+                value={form.status}
+                onChange={e => setForm({ ...form, status: e.target.value as any })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 font-semibold"
+              >
+                <option value="draft">Draft</option>
+                <option value="submitted">Submitted</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="approved">Approved</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Business Purpose & Objective</label>
+            <textarea
+              rows={2}
+              placeholder="What core business problem does this website solve for the client?"
+              value={form.business_purpose}
+              onChange={e => setForm({ ...form, business_purpose: e.target.value })}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          {/* Section 2: Pages Checklist */}
+          <div>
+            <label className="block text-slate-500 mb-1.5 font-semibold uppercase text-[11px]">
+              Required Website Pages ({form.pages.length} selected)
+            </label>
+            <div className="flex flex-wrap gap-1.5 p-3 rounded-lg bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838]">
+              {DEFAULT_PAGES.map(page => {
+                const active = form.pages.includes(page)
+                return (
+                  <button
+                    type="button"
+                    key={page}
+                    onClick={() => togglePage(page)}
+                    className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                      active
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-[#1E1E1E] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#383838]'
+                    }`}
+                  >
+                    {active ? '✓ ' : '+ '}{page}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="Add custom page..."
+                value={customPage}
+                onChange={e => setCustomPage(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomPage() } }}
+                className="flex-1 px-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100"
+              />
+              <button
+                type="button"
+                onClick={addCustomPage}
+                className="px-3 py-1.5 bg-slate-200 dark:bg-[#383838] text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold"
+              >
+                Add Page
+              </button>
+            </div>
+          </div>
+
+          {/* Section 3: Features Checklist */}
+          <div>
+            <label className="block text-slate-500 mb-1.5 font-semibold uppercase text-[11px]">
+              Required Features ({form.features.length} selected)
+            </label>
+            <div className="flex flex-wrap gap-1.5 p-3 rounded-lg bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838]">
+              {DEFAULT_FEATURES.map(feat => {
+                const active = form.features.includes(feat)
+                return (
+                  <button
+                    type="button"
+                    key={feat}
+                    onClick={() => toggleFeature(feat)}
+                    className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                      active
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white dark:bg-[#1E1E1E] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#383838]'
+                    }`}
+                  >
+                    {active ? '✓ ' : '+ '}{feat}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="Add custom feature requirement..."
+                value={customFeature}
+                onChange={e => setCustomFeature(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomFeature() } }}
+                className="flex-1 px-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100"
+              />
+              <button
+                type="button"
+                onClick={addCustomFeature}
+                className="px-3 py-1.5 bg-slate-200 dark:bg-[#383838] text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold"
+              >
+                Add Feature
+              </button>
+            </div>
+          </div>
+
+          {/* Section 4: Technical Specs */}
+          <div className="p-3 bg-slate-50 dark:bg-[#252525] rounded-xl border border-slate-200 dark:border-[#383838] space-y-3">
+            <h4 className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              Technical Architecture & Integrations
+            </h4>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-500 mb-1">Frontend Framework / Styling</label>
+                <input
+                  type="text"
+                  value={form.frontend_tech}
+                  onChange={e => setForm({ ...form, frontend_tech: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Backend / Server-Side APIs</label>
+                <input
+                  type="text"
+                  value={form.backend_tech}
+                  onChange={e => setForm({ ...form, backend_tech: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Database Solution</label>
+                <input
+                  type="text"
+                  value={form.database_tech}
+                  onChange={e => setForm({ ...form, database_tech: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Payment Gateway</label>
+                <input
+                  type="text"
+                  placeholder="Stripe, Razorpay, PayFast, None..."
+                  value={form.payment_gateway}
+                  onChange={e => setForm({ ...form, payment_gateway: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Shipping Integration</label>
+                <input
+                  type="text"
+                  placeholder="Shiprocket, Courier Guy, None..."
+                  value={form.shipping_integration}
+                  onChange={e => setForm({ ...form, shipping_integration: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1">Domain Requirements</label>
+                <input
+                  type="text"
+                  placeholder="e.g. CapeSecure to purchase or Client provides"
+                  value={form.domain_requirements}
+                  onChange={e => setForm({ ...form, domain_requirements: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded-lg"
+                />
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-slate-500 mb-1">Hosting & Deployment Target</label>
+                <input
+                  type="text"
+                  placeholder="Vercel Edge, AWS, Cloudflare, CapeSecure Managed..."
+                  value={form.hosting_requirements}
+                  onChange={e => setForm({ ...form, hosting_requirements: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Commercials & Dates */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-slate-500 mb-1">Budget Min (ZAR)</label>
+              <input
+                type="number"
+                placeholder="25000"
+                value={form.budget_min}
+                onChange={e => setForm({ ...form, budget_min: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Budget Max (ZAR)</label>
+              <input
+                type="number"
+                placeholder="40000"
+                value={form.budget_max}
+                onChange={e => setForm({ ...form, budget_max: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Estimated Delivery Date</label>
+              <input
+                type="date"
+                value={form.estimated_delivery_date}
+                onChange={e => setForm({ ...form, estimated_delivery_date: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg"
+              />
+            </div>
+          </div>
+
+          {/* Section 6: Reference Websites */}
+          <div>
+            <label className="block text-slate-500 mb-1.5 font-semibold uppercase text-[11px]">
+              Reference Websites & Benchmarks
+            </label>
+            <div className="space-y-1.5 mb-2">
+              {form.reference_websites.filter(r => r.url).map((ref, idx) => (
+                <div key={idx} className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-[#252525] border border-slate-200 dark:border-[#383838]">
+                  <div>
+                    <span className="font-semibold text-blue-500">{ref.url}</span>
+                    {ref.notes && <span className="text-slate-400 ml-2">— {ref.notes}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeReferenceWebsite(idx)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="https://example.com"
+                value={newRefUrl}
+                onChange={e => setNewRefUrl(e.target.value)}
+                className="flex-1 px-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg"
+              />
+              <input
+                type="text"
+                placeholder="What client likes about it..."
+                value={newRefNote}
+                onChange={e => setNewRefNote(e.target.value)}
+                className="flex-1 px-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg"
+              />
+              <button
+                type="button"
+                onClick={addReferenceWebsite}
+                className="px-3 py-1.5 bg-slate-200 dark:bg-[#383838] rounded-lg font-semibold"
+              >
+                Add Ref
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Additional Constraints & Notes</label>
+            <textarea
+              rows={2}
+              placeholder="Any specific third-party APIs, legacy integrations, compliance requirements..."
+              value={form.additional_notes}
+              onChange={e => setForm({ ...form, additional_notes: e.target.value })}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-[#E5E5E5] dark:border-[#2D2D2D]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] text-xs font-medium text-slate-600 dark:text-slate-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-1.5 rounded-lg bg-[#0D99FF] hover:bg-[#0D99FF]/90 text-white text-xs font-semibold shadow-sm"
+            >
+              {initial ? 'Save Specification Changes' : 'Create Requirement Specification'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

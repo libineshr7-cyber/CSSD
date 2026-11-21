@@ -91,8 +91,38 @@ export interface Database {
 
 // ─── Domain Models ───────────────────────────────────────────────────────────
 
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost'
-export type LeadSource = 'website' | 'referral' | 'social' | 'cold_call' | 'email' | 'event' | 'other'
+export type LeadStatus =
+  | 'new_lead'
+  | 'contacted'
+  | 'discussion'
+  | 'requirements_pending'
+  | 'quotation_preparation'
+  | 'quotation_sent'
+  | 'won'
+  | 'lost'
+  | 'new'
+  | 'qualified'
+  | 'proposal'
+  | 'negotiation'
+
+export type LeadSource =
+  | 'website'
+  | 'referral'
+  | 'social'
+  | 'cold_call'
+  | 'cold_outreach'
+  | 'email'
+  | 'event'
+  | 'google_ads'
+  | 'other'
+  | string
+
+export interface LeadNoteItem {
+  id: string
+  text: string
+  author: string
+  created_at: string
+}
 
 export interface Lead {
   id: string
@@ -106,22 +136,37 @@ export interface Lead {
   notes: string | null
   assigned_to: string | null
   next_follow_up: string | null
+  follow_up_time?: string | null
+  follow_up_notes?: string | null
+  notes_history?: LeadNoteItem[]
+  is_archived?: boolean
+  archived_at?: string | null
+  archived_reason?: string | null
+  converted_client_id?: string | null
   created_at: string
   updated_at: string
 }
 
-export type ClientStatus = 'active' | 'inactive' | 'suspended' | 'churned'
+export type ClientStatus = 'active' | 'inactive' | 'suspended' | 'churned' | 'archived' | 'completed'
+export type PreferredComm = 'email' | 'phone' | 'whatsapp' | 'slack' | 'teams'
 
 export interface Client {
   id: string
+  client_code: string // e.g. CS-CLIENT-0001
   lead_id: string | null
   name: string
+  business_name?: string | null
+  company: string | null
+  business_category?: string | null
   email: string
   phone: string | null
-  company: string | null
   address: string | null
   city: string | null
+  state?: string | null
+  postal_code?: string | null
   country: string | null
+  gstin?: string | null
+  preferred_comm?: PreferredComm
   status: ClientStatus
   avatar_url: string | null
   notes: string | null
@@ -129,19 +174,48 @@ export interface Client {
   updated_at: string
 }
 
+export interface RequirementReference {
+  url: string
+  notes?: string
+}
+
+export interface RequirementAttachment {
+  id: string
+  name: string
+  url?: string
+  size?: number
+  type?: string
+  uploaded_at: string
+}
+
 export interface Requirement {
   id: string
   client_id: string
+  lead_id?: string | null
   project_id: string | null
   title: string
-  description: string
+  description?: string
   website_type: string
+  business_purpose?: string | null
   pages: string[]
   features: string[]
+  frontend_tech?: string | null
+  backend_tech?: string | null
+  database_tech?: string | null
+  payment_gateway?: string | null
+  shipping_integration?: string | null
+  domain_requirements?: string | null
+  hosting_requirements?: string | null
   design_preferences: string | null
   reference_urls: string[]
+  reference_websites?: RequirementReference[]
   timeline: string | null
   budget_range: string | null
+  budget_min?: number | null
+  budget_max?: number | null
+  estimated_delivery_date?: string | null
+  additional_notes?: string | null
+  attachments?: RequirementAttachment[]
   status: 'draft' | 'submitted' | 'reviewed' | 'approved'
   created_at: string
   updated_at: string

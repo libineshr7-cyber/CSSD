@@ -1,413 +1,1123 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
-  Plus, Search, Edit2, X, ChevronDown,
-  Mail, Phone, MapPin, Building2, User, Users, TrendingUp
+  Plus, Search, Edit2, Trash2, X,
+  Building2, Mail, Phone, MapPin,
+  Calendar, FileText, CheckCircle2,
+  Clock, ShieldAlert, Copy, Check, Eye,
+  RefreshCw, DollarSign, Briefcase
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { formatCurrency, formatDate, getInitials } from '../lib/utils'
-import { demoClients, demoPayments } from '../data/demoData'
-import type { Client, ClientStatus } from '../types/database'
+import { formatCurrency, formatDate } from '../lib/utils'
+import { demoClients } from '../data/demoData'
+import { supabase } from '../lib/supabase'
+import { fetchClientFullHistory, type ClientFullHistory } from '../lib/clientHistory'
+import { openPrintableRequirementSummary } from '../lib/pdfGenerator'
+import type { Client, ClientStatus, PreferredComm } from '../types/database'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
-type FormData = {
-  name: string
-  email: string
-  phone: string
-  company: string
-  address: string
-  city: string
-  country: string
-  status: ClientStatus
-  notes: string
-}
-
-const EMPTY_FORM: FormData = {
-  name: '', email: '', phone: '', company: '',
-  address: '', city: '', country: 'South Africa', status: 'active', notes: '',
-}
-
-// ─── Status config ────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<ClientStatus, { badge: string; label: string; dot: string }> = {
-  active:    { badge: 'bg-green-500/10 text-green-400 border-green-500/20',    dot: 'bg-green-500',   label: 'Active' },
-  inactive:  { badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',   dot: 'bg-slate-500',   label: 'Inactive' },
-  suspended: { badge: 'bg-red-500/10 text-red-400 border-red-500/20',         dot: 'bg-red-500',     label: 'Suspended' },
-  churned:   { badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20', dot: 'bg-orange-500', label: 'Churned' },
-}
-
-// ─── Avatar colors ────────────────────────────────────────────────────────────
-
-const AVATAR_COLORS = [
-  'bg-blue-600 text-blue-100',
-  'bg-purple-600 text-purple-100',
-  'bg-emerald-600 text-emerald-100',
-  'bg-orange-600 text-orange-100',
-  'bg-pink-600 text-pink-100',
-  'bg-cyan-600 text-cyan-100',
+const BUSINESS_CATEGORIES = [
+  'E-Commerce & Retail',
+  'Healthcare & Wellness',
+  'Real Estate & Construction',
+  'Technology & SaaS',
+  'Corporate & Professional Services',
+  'Finance & Banking',
+  'Hospitality & Tourism',
+  'Education & Training',
+  'Manufacturing & Logistics',
+  'Media & Entertainment',
+  'Other',
 ]
 
-function getAvatarColor(id: string) {
-  const idx = id.charCodeAt(id.length - 1) % AVATAR_COLORS.length
-  return AVATAR_COLORS[idx]
+const COMM_METHODS: { key: PreferredComm; label: string; icon: string }[] = [
+  { key: 'email', label: 'Email', icon: '✉️' },
+  { key: 'whatsapp', label: 'WhatsApp', icon: '💬' },
+  { key: 'phone', label: 'Phone', icon: '📞' },
+  { key: 'slack', label: 'Slack', icon: '💼' },
+  { key: 'teams', label: 'MS Teams', icon: '👥' },
+]
+
+const CLIENT_STATUS_STYLES: Record<ClientStatus, { badge: string; dot: string; label: string }> = {
+  active:    { badge: 'bg-green-500/10 text-green-400 border-green-500/20',   dot: 'bg-green-500',  label: 'Active' },
+  inactive:  { badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',  dot: 'bg-slate-500', label: 'Inactive' },
+  suspended: { badge: 'bg-red-500/10 text-red-400 border-red-500/20',        dot: 'bg-red-500',   label: 'Suspended' },
+  churned:   { badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20',dot: 'bg-orange-500',label: 'Churned' },
+  archived:  { badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',  dot: 'bg-amber-500', label: 'Archived' },
+  completed: { badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',     dot: 'bg-blue-500',  label: 'Completed' },
 }
 
-// ─── Form input helpers ───────────────────────────────────────────────────────
+export default function ClientsPage() {
+  const [clients, setClients] = useState<Client[]>(demoClients)
+  const [loading, setLoading] = useState(false)
 
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  // Filters & Pagination
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'id_desc' | 'name_asc' | 'date_desc'>('id_desc')
+  const [page, setPage] = useState(1)
+  const pageSize = 8
+
+  // Modals & Drawers
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editClient, setEditClient] = useState<Client | null>(null)
+  const [deleteConfirmClient, setDeleteConfirmClient] = useState<Client | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  // 360° History Drawer
+  const [activeHistoryClientId, setActiveHistoryClientId] = useState<string | null>(null)
+  const [historyData, setHistoryData] = useState<ClientFullHistory | null>(null)
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyTab, setHistoryTab] = useState<'overview' | 'requirements' | 'projects' | 'commercials' | 'documents'>('overview')
+
+  // Load clients from Supabase
+  const loadClients = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await (supabase as any)
+        .from('clients')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (!error && data && data.length > 0) {
+        setClients(data as Client[])
+      }
+    } catch (_) {}
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadClients()
+  }, [])
+
+  // Load 360° History
+  const openClientHistory = async (clientId: string) => {
+    setActiveHistoryClientId(clientId)
+    setLoadingHistory(true)
+    setHistoryTab('overview')
+    const fullHistory = await fetchClientFullHistory(clientId)
+    setHistoryData(fullHistory)
+    setLoadingHistory(false)
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(text)
+    toast.success(`Copied: ${text}`)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  // ─── Filter & Sort ──────────────────────────────────────────────────────────
+  const filteredClients = useMemo(() => {
+    return clients.filter(c => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false
+      if (categoryFilter !== 'all' && c.business_category !== categoryFilter) return false
+
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        const matchCode = (c.client_code || '').toLowerCase().includes(q)
+        const matchName = c.name.toLowerCase().includes(q)
+        const matchCompany = (c.company || c.business_name || '').toLowerCase().includes(q)
+        const matchEmail = c.email.toLowerCase().includes(q)
+        const matchPhone = (c.phone || '').toLowerCase().includes(q)
+        const matchGstin = (c.gstin || '').toLowerCase().includes(q)
+        if (!matchCode && !matchName && !matchCompany && !matchEmail && !matchPhone && !matchGstin) return false
+      }
+      return true
+    }).sort((a, b) => {
+      if (sortBy === 'id_desc') return (b.client_code || '').localeCompare(a.client_code || '')
+      if (sortBy === 'name_asc') return a.name.localeCompare(b.name)
+      if (sortBy === 'date_desc') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      return 0
+    })
+  }, [clients, search, statusFilter, categoryFilter, sortBy])
+
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / pageSize))
+  const paginatedClients = filteredClients.slice((page - 1) * pageSize, page * pageSize)
+
+  // ─── Save / Update Client with Duplicate Checking ───────────────────────────
+  const handleSaveClient = async (formData: Partial<Client>, isEdit: boolean) => {
+    if (!formData.name?.trim() || !formData.email?.trim()) {
+      toast.error('Client name and email are required.')
+      return
+    }
+
+    try {
+      if (isEdit && editClient) {
+        const updated: Client = {
+          ...editClient,
+          ...formData,
+          updated_at: new Date().toISOString(),
+        }
+
+        await (supabase as any)
+          .from('clients')
+          .update(formData)
+          .eq('id', editClient.id)
+
+        setClients(prev => prev.map(c => c.id === editClient.id ? updated : c))
+        if (historyData?.client.id === editClient.id) {
+          setHistoryData(prev => prev ? { ...prev, client: updated } : null)
+        }
+        toast.success(`Client ${updated.client_code} updated successfully`)
+        setEditClient(null)
+      } else {
+        // Auto generate client code
+        const nextNum = clients.length + 1
+        const clientCode = `CS-CLIENT-${String(nextNum).padStart(4, '0')}`
+
+        const newClient: Client = {
+          id: `client-${Date.now()}`,
+          client_code: clientCode,
+          lead_id: null,
+          name: formData.name.trim(),
+          business_name: formData.business_name || formData.company || formData.name.trim(),
+          company: formData.company || formData.business_name || formData.name.trim(),
+          business_category: formData.business_category || 'Corporate & Professional Services',
+          email: formData.email.trim(),
+          phone: formData.phone || null,
+          address: formData.address || null,
+          city: formData.city || null,
+          state: formData.state || null,
+          postal_code: formData.postal_code || null,
+          country: formData.country || 'South Africa',
+          gstin: formData.gstin || null,
+          preferred_comm: formData.preferred_comm || 'email',
+          status: formData.status || 'active',
+          avatar_url: null,
+          notes: formData.notes || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
+        try {
+          const { data } = await (supabase as any)
+            .from('clients')
+            .insert({
+              client_code: newClient.client_code,
+              name: newClient.name,
+              business_name: newClient.business_name,
+              company: newClient.company,
+              business_category: newClient.business_category,
+              email: newClient.email,
+              phone: newClient.phone,
+              address: newClient.address,
+              city: newClient.city,
+              state: newClient.state,
+              postal_code: newClient.postal_code,
+              country: newClient.country,
+              gstin: newClient.gstin,
+              preferred_comm: newClient.preferred_comm,
+              status: newClient.status,
+              notes: newClient.notes,
+            })
+            .select()
+            .single()
+
+          if (data) {
+            newClient.id = data.id
+            if (data.client_code) newClient.client_code = data.client_code
+          }
+        } catch (_) {}
+
+        setClients(prev => [newClient, ...prev])
+        toast.success(`Client created! ID: ${newClient.client_code}`)
+        setCreateModalOpen(false)
+      }
+    } catch (err: any) {
+      toast.error('Failed to save client: ' + err.message)
+    }
+  }
+
+  const handleDeleteClient = async (clientId: string) => {
+    try {
+      await (supabase as any)
+        .from('clients')
+        .delete()
+        .eq('id', clientId)
+
+      setClients(prev => prev.filter(c => c.id !== clientId))
+      if (activeHistoryClientId === clientId) setActiveHistoryClientId(null)
+      toast.success('Client record removed')
+      setDeleteConfirmClient(null)
+    } catch (_) {
+      toast.error('Could not delete client')
+    }
+  }
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div>
-      <label className="block text-sm font-medium text-slate-400 mb-1.5">{label}</label>
-      {children}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Client Directory & Accounts</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Manage authorized client accounts, unique client IDs, business categories, and view complete project histories.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadClients}
+            className="p-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+            title="Refresh clients"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="px-3 py-1.5 bg-[#0D99FF] hover:bg-[#0D99FF]/90 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add New Client
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Total Clients</div>
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">{clients.length}</div>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Active Accounts</div>
+          <div className="text-xl font-bold text-green-500 mt-1">
+            {clients.filter(c => c.status === 'active').length}
+          </div>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Corporate & Enterprise</div>
+          <div className="text-xl font-bold text-blue-500 mt-1">
+            {clients.filter(c => (c.business_category || '').includes('Corporate') || (c.business_category || '').includes('Finance')).length}
+          </div>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">E-Commerce Clients</div>
+          <div className="text-xl font-bold text-purple-500 mt-1">
+            {clients.filter(c => (c.business_category || '').includes('E-Commerce')).length}
+          </div>
+        </div>
+      </div>
+
+      {/* Search & Filter Bar */}
+      <div className="p-3 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by Client ID (CS-CLIENT-0001), Client name, Business, Email, Phone, GSTIN..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              className="w-full pl-9 pr-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0D99FF]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Category Filter */}
+            <select
+              value={categoryFilter}
+              onChange={e => { setCategoryFilter(e.target.value); setPage(1) }}
+              className="px-2.5 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
+            >
+              <option value="all">All Categories</option>
+              {BUSINESS_CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+
+            {/* Sort */}
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              className="px-2.5 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
+            >
+              <option value="id_desc">Client ID (Newest)</option>
+              <option value="name_asc">Client Name (A–Z)</option>
+              <option value="date_desc">Creation Date</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Status Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-[#E5E5E5] dark:border-[#2D2D2D] pt-2">
+          <button
+            onClick={() => { setStatusFilter('all'); setPage(1) }}
+            className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap ${
+              statusFilter === 'all'
+                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#282828]'
+            }`}
+          >
+            All Accounts ({clients.length})
+          </button>
+
+          {['active', 'inactive', 'suspended', 'completed'].map(st => {
+            const count = clients.filter(c => c.status === st).length
+            const cfg = CLIENT_STATUS_STYLES[st as ClientStatus] || CLIENT_STATUS_STYLES.active
+            return (
+              <button
+                key={st}
+                onClick={() => { setStatusFilter(st); setPage(1) }}
+                className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                  statusFilter === st
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#282828]'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                {cfg.label} ({count})
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Clients Table */}
+      <div className="bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl overflow-hidden shadow-sm">
+        {paginatedClients.length === 0 ? (
+          <div className="py-16 text-center">
+            <Building2 className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">No client accounts found</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+              No clients match your filter criteria or search query.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-[#E5E5E5] dark:border-[#2D2D2D] bg-[#F9FAFB] dark:bg-[#252525] text-slate-500 dark:text-slate-400 font-medium">
+                  <th className="py-2.5 px-4">Client ID</th>
+                  <th className="py-2.5 px-4">Client & Business</th>
+                  <th className="py-2.5 px-4">Category</th>
+                  <th className="py-2.5 px-4">Contact Info</th>
+                  <th className="py-2.5 px-4">Preferred Comm</th>
+                  <th className="py-2.5 px-4">Status</th>
+                  <th className="py-2.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5E5E5] dark:divide-[#2D2D2D]">
+                {paginatedClients.map(client => {
+                  const statusStyle = CLIENT_STATUS_STYLES[client.status] || CLIENT_STATUS_STYLES.active
+                  const comm = COMM_METHODS.find(m => m.key === client.preferred_comm) || COMM_METHODS[0]
+
+                  return (
+                    <tr
+                      key={client.id}
+                      className="hover:bg-slate-50/80 dark:hover:bg-[#252525]/50 transition-colors cursor-pointer"
+                      onClick={() => openClientHistory(client.id)}
+                    >
+                      {/* Client ID */}
+                      <td className="py-3 px-4" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-[#0D99FF]">
+                            {client.client_code || 'CS-CLIENT-XXXX'}
+                          </span>
+                          <button
+                            onClick={() => copyToClipboard(client.client_code || '')}
+                            title="Copy Client ID"
+                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                          >
+                            {copiedId === client.client_code ? (
+                              <Check className="w-3 h-3 text-green-500" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Added {formatDate(client.created_at)}
+                        </div>
+                      </td>
+
+                      {/* Name & Business */}
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                          {client.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Building2 className="w-3 h-3 text-slate-400" />
+                          {client.business_name || client.company || '—'}
+                          {client.gstin && (
+                            <span className="ml-1 px-1.5 py-0.2 rounded text-[10px] bg-slate-100 dark:bg-[#282828] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#383838]">
+                              GSTIN: {client.gstin}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Business Category */}
+                      <td className="py-3 px-4">
+                        <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-[#282828] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#383838]">
+                          {client.business_category || 'General'}
+                        </span>
+                      </td>
+
+                      {/* Contact Info */}
+                      <td className="py-3 px-4">
+                        <div className="text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          <Mail className="w-3 h-3 text-slate-400" />
+                          {client.email}
+                        </div>
+                        {client.phone && (
+                          <div className="text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 text-[11px]">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            {client.phone}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Preferred Comm */}
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-blue-500/10 text-blue-500 border border-blue-500/20 capitalize">
+                          <span>{comm.icon}</span>
+                          <span>{comm.label}</span>
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusStyle.badge}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+                          {statusStyle.label}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openClientHistory(client.id)}
+                            title="View 360° History"
+                            className="px-2 py-1 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 rounded text-[11px] font-semibold flex items-center gap-1"
+                          >
+                            <Eye className="w-3 h-3" /> History
+                          </button>
+
+                          <button
+                            onClick={() => setEditClient(client)}
+                            title="Edit Client"
+                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => setDeleteConfirmClient(client)}
+                            title="Delete Client"
+                            className="p-1 text-slate-400 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="py-2.5 px-4 border-t border-[#E5E5E5] dark:border-[#2D2D2D] bg-[#F9FAFB] dark:bg-[#252525] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <div>
+            Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, filteredClients.length)} of {filteredClients.length} accounts
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-2.5 py-1 rounded border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span className="font-semibold px-2">{page} / {totalPages}</span>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="px-2.5 py-1 rounded border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── 360° CLIENT HISTORY DRAWER ───────────────────────────────────────── */}
+      {activeHistoryClientId && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs" onClick={() => setActiveHistoryClientId(null)}>
+          <div
+            className="w-full max-w-2xl h-full bg-white dark:bg-[#1E1E1E] border-l border-[#E5E5E5] dark:border-[#2D2D2D] shadow-2xl p-6 overflow-y-auto space-y-6"
+            onClick={e => e.stopPropagation()}
+          >
+            {loadingHistory || !historyData ? (
+              <div className="py-24 text-center">
+                <RefreshCw className="w-8 h-8 text-[#0D99FF] animate-spin mx-auto mb-2" />
+                <p className="text-xs text-slate-400">Aggregating client lifecycle records...</p>
+              </div>
+            ) : (
+              <>
+                {/* Drawer Header */}
+                <div className="flex items-start justify-between border-b border-[#E5E5E5] dark:border-[#2D2D2D] pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-[#0D99FF]/10 text-[#0D99FF]">
+                        {historyData.client.client_code}
+                      </span>
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                        {historyData.client.name}
+                      </h2>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {historyData.client.business_name || historyData.client.company} • Category: {historyData.client.business_category}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveHistoryClientId(null)}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* KPI Ribbon */}
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-3 bg-[#F9FAFB] dark:bg-[#252525] rounded-lg border border-[#E5E5E5] dark:border-[#383838]">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Invoiced</div>
+                    <div className="font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                      {formatCurrency(historyData.summary.totalBilled)}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-[#F9FAFB] dark:bg-[#252525] rounded-lg border border-[#E5E5E5] dark:border-[#383838]">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Received</div>
+                    <div className="font-bold text-green-500 mt-0.5">
+                      {formatCurrency(historyData.summary.totalPaid)}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-[#F9FAFB] dark:bg-[#252525] rounded-lg border border-[#E5E5E5] dark:border-[#383838]">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold">Outstanding Balance</div>
+                    <div className="font-bold text-amber-500 mt-0.5">
+                      {formatCurrency(historyData.summary.outstandingBalance)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* History Tabs */}
+                <div className="flex border-b border-[#E5E5E5] dark:border-[#2D2D2D] gap-2 text-xs">
+                  <button
+                    onClick={() => setHistoryTab('overview')}
+                    className={`pb-2 px-1 font-semibold border-b-2 transition-colors ${
+                      historyTab === 'overview'
+                        ? 'border-[#0D99FF] text-[#0D99FF]'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    Overview & Origin
+                  </button>
+                  <button
+                    onClick={() => setHistoryTab('requirements')}
+                    className={`pb-2 px-1 font-semibold border-b-2 transition-colors ${
+                      historyTab === 'requirements'
+                        ? 'border-[#0D99FF] text-[#0D99FF]'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    Requirements ({historyData.requirements.length})
+                  </button>
+                  <button
+                    onClick={() => setHistoryTab('projects')}
+                    className={`pb-2 px-1 font-semibold border-b-2 transition-colors ${
+                      historyTab === 'projects'
+                        ? 'border-[#0D99FF] text-[#0D99FF]'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    Projects ({historyData.projects.length})
+                  </button>
+                  <button
+                    onClick={() => setHistoryTab('commercials')}
+                    className={`pb-2 px-1 font-semibold border-b-2 transition-colors ${
+                      historyTab === 'commercials'
+                        ? 'border-[#0D99FF] text-[#0D99FF]'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    Quotes & Invoices
+                  </button>
+                </div>
+
+                {/* Tab: Overview */}
+                {historyTab === 'overview' && (
+                  <div className="space-y-4 text-xs">
+                    <div className="p-4 bg-[#F9FAFB] dark:bg-[#252525] rounded-xl border border-[#E5E5E5] dark:border-[#383838] space-y-2.5">
+                      <h4 className="font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider text-[11px]">
+                        Account Profile & Billing Details
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><span className="text-slate-500">Email:</span> {historyData.client.email}</div>
+                        <div><span className="text-slate-500">Phone:</span> {historyData.client.phone || '—'}</div>
+                        <div><span className="text-slate-500">Address:</span> {historyData.client.address || '—'}</div>
+                        <div><span className="text-slate-500">City/Country:</span> {historyData.client.city || '—'}, {historyData.client.country}</div>
+                        <div><span className="text-slate-500">GSTIN / Tax ID:</span> {historyData.client.gstin || 'None'}</div>
+                        <div><span className="text-slate-500">Preferred Channel:</span> {historyData.client.preferred_comm || 'Email'}</div>
+                      </div>
+                    </div>
+
+                    {/* Acquisition Lead Origin */}
+                    {historyData.lead ? (
+                      <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 space-y-2">
+                        <div className="flex justify-between items-center text-xs font-semibold text-blue-500">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5" /> Acquisition Lead Origin
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            Enquired: {formatDate(historyData.lead.created_at)}
+                          </span>
+                        </div>
+                        <div className="text-slate-700 dark:text-slate-300 space-y-1">
+                          <p><strong>Enquiry Source:</strong> {historyData.lead.source}</p>
+                          <p><strong>Initial Stated Budget:</strong> {historyData.lead.budget ? formatCurrency(historyData.lead.budget) : 'TBD'}</p>
+                          {historyData.lead.notes && (
+                            <p className="italic text-slate-500 dark:text-slate-400 mt-1">"{historyData.lead.notes}"</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 text-slate-400 bg-slate-50 dark:bg-[#252525] rounded-lg">
+                        Direct Client Creation (No lead conversion history)
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Requirements */}
+                {historyTab === 'requirements' && (
+                  <div className="space-y-3 text-xs">
+                    {historyData.requirements.length === 0 ? (
+                      <p className="text-slate-400 py-6 text-center">No requirement specifications created yet.</p>
+                    ) : (
+                      historyData.requirements.map(req => (
+                        <div key={req.id} className="p-4 bg-[#F9FAFB] dark:bg-[#252525] rounded-xl border border-[#E5E5E5] dark:border-[#383838] space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-bold text-slate-900 dark:text-slate-100">{req.title}</h4>
+                              <p className="text-slate-500 text-[11px] capitalize">Website Type: {req.website_type.replace('_', ' ')}</p>
+                            </div>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-500 border border-blue-500/20 uppercase">
+                              {req.status}
+                            </span>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-2 border-t border-[#E5E5E5] dark:border-[#383838]">
+                            <button
+                              onClick={() => openPrintableRequirementSummary({ requirement: req, client: historyData.client, lead: historyData.lead })}
+                              className="px-2.5 py-1 bg-[#0D99FF] text-white rounded text-[11px] font-semibold flex items-center gap-1 shadow-xs"
+                            >
+                              <FileText className="w-3 h-3" /> View & Print Summary PDF
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Projects */}
+                {historyTab === 'projects' && (
+                  <div className="space-y-3 text-xs">
+                    {historyData.projects.length === 0 ? (
+                      <p className="text-slate-400 py-6 text-center">No projects assigned yet.</p>
+                    ) : (
+                      historyData.projects.map(proj => (
+                        <div key={proj.id} className="p-4 bg-[#F9FAFB] dark:bg-[#252525] rounded-xl border border-[#E5E5E5] dark:border-[#383838] space-y-2">
+                          <div className="flex justify-between">
+                            <h4 className="font-bold text-slate-900 dark:text-slate-100">{proj.name}</h4>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-500 uppercase">
+                              {proj.status}
+                            </span>
+                          </div>
+                          <p className="text-slate-500 text-[11px]">{proj.description}</p>
+                          <div className="w-full bg-slate-200 dark:bg-[#383838] h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-[#0D99FF] h-full" style={{ width: `${proj.progress || 0}%` }} />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Commercials */}
+                {historyTab === 'commercials' && (
+                  <div className="space-y-3 text-xs">
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100">Invoices & Agreements</h4>
+                    {historyData.invoices.length === 0 ? (
+                      <p className="text-slate-400 py-4">No invoices billed to date.</p>
+                    ) : (
+                      historyData.invoices.map(inv => (
+                        <div key={inv.id} className="p-3 bg-[#F9FAFB] dark:bg-[#252525] rounded-lg border border-[#E5E5E5] dark:border-[#383838] flex justify-between items-center">
+                          <div>
+                            <div className="font-semibold text-slate-900 dark:text-slate-100">{inv.invoice_number}</div>
+                            <div className="text-[10px] text-slate-400">Due: {formatDate(inv.due_date)}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-slate-900 dark:text-slate-100">{formatCurrency(inv.total)}</div>
+                            <span className="text-[10px] font-semibold text-green-500 uppercase">{inv.status}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── CREATE / EDIT CLIENT MODAL ──────────────────────────────────────── */}
+      {(createModalOpen || editClient) && (
+        <ClientFormModal
+          open={createModalOpen || !!editClient}
+          initial={editClient || undefined}
+          existingClients={clients}
+          onClose={() => { setCreateModalOpen(false); setEditClient(null) }}
+          onSave={data => handleSaveClient(data, !!editClient)}
+        />
+      )}
+
+      {/* ─── DELETE CLIENT CONFIRMATION MODAL ─────────────────────────────────── */}
+      {deleteConfirmClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-white dark:bg-[#1E1E1E] rounded-xl border border-[#E5E5E5] dark:border-[#383838] p-5 space-y-3 shadow-xl">
+            <h3 className="text-sm font-bold text-red-500 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4" />
+              Delete Client Record?
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Are you sure you want to remove client <strong>{deleteConfirmClient.client_code} - {deleteConfirmClient.name}</strong>?
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setDeleteConfirmClient(null)}
+                className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] text-xs font-medium text-slate-600 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteClient(deleteConfirmClient.id)}
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+              >
+                Delete Client
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-const inputCls = 'w-full px-3 py-2 bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D99FF] focus:border-transparent'
+// ─── CLIENT FORM MODAL (WITH DUPLICATE WARNING) ───────────────────────────────
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
-
-function ClientModal({
-  open, onClose, onSave, initial, title,
+function ClientFormModal({
+  open,
+  initial,
+  existingClients,
+  onClose,
+  onSave,
 }: {
-  open: boolean; onClose: () => void; onSave: (d: FormData) => void; initial: FormData; title: string
+  open: boolean
+  initial?: Client
+  existingClients: Client[]
+  onClose: () => void
+  onSave: (data: Partial<Client>) => void
 }) {
-  const [form, setForm] = useState<FormData>(initial)
+  const [form, setForm] = useState({
+    name: initial?.name || '',
+    business_name: initial?.business_name || initial?.company || '',
+    business_category: initial?.business_category || 'Corporate & Professional Services',
+    email: initial?.email || '',
+    phone: initial?.phone || '',
+    address: initial?.address || '',
+    city: initial?.city || 'Cape Town',
+    state: initial?.state || 'Western Cape',
+    postal_code: initial?.postal_code || '',
+    country: initial?.country || 'South Africa',
+    gstin: initial?.gstin || '',
+    preferred_comm: (initial?.preferred_comm || 'email') as PreferredComm,
+    status: (initial?.status || 'active') as ClientStatus,
+    notes: initial?.notes || '',
+  })
+
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null)
+  const [allowDuplicateBypass, setAllowDuplicateBypass] = useState(false)
 
   if (!open) return null
 
-  const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }))
+  // Live duplicate checking
+  const checkDuplicate = (email: string, phone: string, gstin: string) => {
+    const cleanEmail = email.trim().toLowerCase()
+    const cleanPhone = phone.trim().replace(/[\s-]/g, '')
+    const cleanGstin = gstin.trim().toUpperCase()
+
+    const match = existingClients.find(c => {
+      if (initial && c.id === initial.id) return false
+      if (cleanEmail && c.email.toLowerCase() === cleanEmail) return true
+      if (cleanPhone && c.phone && c.phone.replace(/[\s-]/g, '') === cleanPhone) return true
+      if (cleanGstin && c.gstin && c.gstin.toUpperCase() === cleanGstin) return true
+      return false
+    })
+
+    if (match) {
+      setDuplicateWarning(
+        `Warning: A client record with matching contact details already exists (${match.client_code} - ${match.name}).`
+      )
+    } else {
+      setDuplicateWarning(null)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name.trim() || !form.email.trim()) { toast.error('Name and email are required'); return }
-    onSave(form)
+    if (duplicateWarning && !allowDuplicateBypass) {
+      toast.error('Please acknowledge the duplicate record warning before submitting.')
+      return
+    }
+    onSave({
+      ...form,
+      company: form.business_name,
+      phone: form.phone || null,
+      address: form.address || null,
+      gstin: form.gstin || null,
+    })
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" onClick={onClose}>
       <div
-        className="relative bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-xl bg-white dark:bg-[#1E1E1E] rounded-xl border border-[#E5E5E5] dark:border-[#383838] p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-[#E5E5E5] dark:border-[#383838]">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-            <X className="w-5 h-5" />
+        <div className="flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#2D2D2D] pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              {initial ? `Edit Client: ${initial.client_code}` : 'Register New Client Account'}
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Client IDs are automatically assigned in sequential format (CS-CLIENT-XXXX).
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Full Name *">
-              <input className={inputCls} value={form.name} onChange={set('name')} placeholder="John Smith" required />
-            </FormField>
-            <FormField label="Email *">
-              <input type="email" className={inputCls} value={form.email} onChange={set('email')} placeholder="john@company.co.za" required />
-            </FormField>
+        {/* Duplicate Warning Box */}
+        {duplicateWarning && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-500 space-y-2">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+              <div>{duplicateWarning}</div>
+            </div>
+            <label className="flex items-center gap-2 text-[11px] cursor-pointer pt-1 font-medium">
+              <input
+                type="checkbox"
+                checked={allowDuplicateBypass}
+                onChange={e => setAllowDuplicateBypass(e.target.checked)}
+                className="rounded border-amber-500 text-amber-500"
+              />
+              Confirm and proceed with record creation anyway
+            </label>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-500 mb-1">Client Contact Name *</label>
+              <input
+                required
+                type="text"
+                value={form.name}
+                onChange={e => setForm({ ...form, name: e.target.value })}
+                placeholder="e.g. David Chen"
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Business / Company Name *</label>
+              <input
+                required
+                type="text"
+                value={form.business_name}
+                onChange={e => setForm({ ...form, business_name: e.target.value })}
+                placeholder="e.g. Apex Financial Pty Ltd"
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Phone">
-              <input className={inputCls} value={form.phone} onChange={set('phone')} placeholder="+27 82 000 0000" />
-            </FormField>
-            <FormField label="Company">
-              <input className={inputCls} value={form.company} onChange={set('company')} placeholder="Acme Pty Ltd" />
-            </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-500 mb-1">Business Category *</label>
+              <select
+                value={form.business_category}
+                onChange={e => setForm({ ...form, business_category: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              >
+                {BUSINESS_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Preferred Communication</label>
+              <select
+                value={form.preferred_comm}
+                onChange={e => setForm({ ...form, preferred_comm: e.target.value as any })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              >
+                {COMM_METHODS.map(m => (
+                  <option key={m.key} value={m.key}>{m.icon} {m.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <FormField label="Address">
-            <input className={inputCls} value={form.address} onChange={set('address')} placeholder="12 Main Street" />
-          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-500 mb-1">Email Address *</label>
+              <input
+                required
+                type="email"
+                value={form.email}
+                onChange={e => {
+                  setForm({ ...form, email: e.target.value })
+                  checkDuplicate(e.target.value, form.phone, form.gstin)
+                }}
+                placeholder="client@apexfin.co.za"
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="City">
-              <input className={inputCls} value={form.city} onChange={set('city')} placeholder="Cape Town" />
-            </FormField>
-            <FormField label="Country">
-              <input className={inputCls} value={form.country} onChange={set('country')} placeholder="South Africa" />
-            </FormField>
+            <div>
+              <label className="block text-slate-500 mb-1">Phone Number</label>
+              <input
+                type="text"
+                value={form.phone}
+                onChange={e => {
+                  setForm({ ...form, phone: e.target.value })
+                  checkDuplicate(form.email, e.target.value, form.gstin)
+                }}
+                placeholder="+27 76 234 5678"
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
           </div>
 
-          <FormField label="Status">
-            <select className={`${inputCls} cursor-pointer`} value={form.status} onChange={set('status')}>
-              {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
-          </FormField>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block text-slate-500 mb-1">Street Address</label>
+              <input
+                type="text"
+                value={form.address}
+                onChange={e => setForm({ ...form, address: e.target.value })}
+                placeholder="12 Buitenkant St"
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
 
-          <FormField label="Notes">
-            <textarea className={`${inputCls} resize-none`} rows={3} value={form.notes} onChange={set('notes')} placeholder="Additional notes..." />
-          </FormField>
+            <div>
+              <label className="block text-slate-500 mb-1">City</label>
+              <input
+                type="text"
+                value={form.city}
+                onChange={e => setForm({ ...form, city: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
+          </div>
 
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 rounded-lg text-sm font-medium transition-colors">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-slate-500 mb-1">GSTIN / Tax Registration</label>
+              <input
+                type="text"
+                value={form.gstin}
+                onChange={e => {
+                  setForm({ ...form, gstin: e.target.value })
+                  checkDuplicate(form.email, form.phone, e.target.value)
+                }}
+                placeholder="27AADCB2234P1Z8"
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 uppercase"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Country</label>
+              <input
+                type="text"
+                value={form.country}
+                onChange={e => setForm({ ...form, country: e.target.value })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Client Status</label>
+              <select
+                value={form.status}
+                onChange={e => setForm({ ...form, status: e.target.value as any })}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="suspended">Suspended</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Internal Notes & History</label>
+            <textarea
+              rows={2}
+              value={form.notes}
+              onChange={e => setForm({ ...form, notes: e.target.value })}
+              placeholder="e.g. VIP client, preferred contract terms..."
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-[#E5E5E5] dark:border-[#2D2D2D]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] text-xs font-medium text-slate-600 dark:text-slate-300"
+            >
               Cancel
             </button>
-            <button type="submit" className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors">
-              Save Client
+            <button
+              type="submit"
+              className="px-4 py-1.5 rounded-lg bg-[#0D99FF] hover:bg-[#0D99FF]/90 text-white text-xs font-semibold shadow-sm"
+            >
+              {initial ? 'Save Client Changes' : 'Create Client Account'}
             </button>
           </div>
         </form>
       </div>
-    </div>
-  )
-}
-
-// ─── Client Card ──────────────────────────────────────────────────────────────
-
-function ClientCard({ client, onEdit, totalRevenue }: { client: Client; onEdit: (c: Client) => void; totalRevenue: number }) {
-  const cfg = STATUS_CONFIG[client.status] ?? STATUS_CONFIG.inactive
-  const avatarCls = getAvatarColor(client.id)
-
-  return (
-    <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-5 hover:border-slate-300 dark:hover:border-slate-600 shadow-xs hover:shadow-md transition-all flex flex-col gap-4">
-      {/* Top row */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold shrink-0 ${avatarCls}`}>
-            {getInitials(client.name)}
-          </div>
-          <div>
-            <p className="font-semibold text-slate-100 leading-tight">{client.name}</p>
-            {client.company && (
-              <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
-                <Building2 className="w-3 h-3" />
-                {client.company}
-              </p>
-            )}
-          </div>
-        </div>
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.badge} shrink-0`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-          {cfg.label}
-        </span>
-      </div>
-
-      {/* Contact info */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 text-sm text-slate-400">
-          <Mail className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-          <span className="truncate">{client.email}</span>
-        </div>
-        {client.phone && (
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Phone className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-            <span>{client.phone}</span>
-          </div>
-        )}
-        {(client.city || client.country) && (
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <MapPin className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-            <span>{[client.city, client.country].filter(Boolean).join(', ')}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Revenue */}
-      {totalRevenue > 0 && (
-        <div className="bg-slate-800/50 rounded-xl px-3 py-2.5">
-          <p className="text-xs text-slate-500 mb-0.5">Total Revenue</p>
-          <p className="text-sm font-semibold text-emerald-400">{formatCurrency(totalRevenue)}</p>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-2 pt-1">
-        <button
-          onClick={() => onEdit(client)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-slate-700 hover:border-blue-500/50 hover:text-blue-400 text-slate-400 rounded-lg text-xs font-medium transition-colors"
-        >
-          <Edit2 className="w-3.5 h-3.5" />
-          Edit
-        </button>
-        <button className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 rounded-lg text-xs font-medium transition-colors border border-blue-500/20">
-          <User className="w-3.5 h-3.5" />
-          View Details
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>(demoClients)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editClient, setEditClient] = useState<Client | null>(null)
-  const [formInitial, setFormInitial] = useState<FormData>(EMPTY_FORM)
-
-  const totalRevenue = useMemo(() =>
-    demoPayments.filter(p => p.status === 'received').reduce((sum, p) => sum + p.amount, 0),
-    []
-  )
-
-  const revenueByClient = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const p of demoPayments) {
-      if (p.status === 'received') map[p.client_id] = (map[p.client_id] ?? 0) + p.amount
-    }
-    return map
-  }, [])
-
-  const stats = useMemo(() => ({
-    active: clients.filter(c => c.status === 'active').length,
-    inactive: clients.filter(c => c.status !== 'active').length,
-    total: clients.length,
-  }), [clients])
-
-  const filtered = useMemo(() => clients.filter(c => {
-    const q = search.toLowerCase()
-    const matchSearch = !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || (c.company ?? '').toLowerCase().includes(q)
-    const matchStatus = statusFilter === 'all' || c.status === statusFilter
-    return matchSearch && matchStatus
-  }), [clients, search, statusFilter])
-
-  const openAdd = () => { setEditClient(null); setFormInitial(EMPTY_FORM); setModalOpen(true) }
-  const openEdit = (client: Client) => {
-    setEditClient(client)
-    setFormInitial({
-      name: client.name, email: client.email, phone: client.phone ?? '',
-      company: client.company ?? '', address: client.address ?? '',
-      city: client.city ?? '', country: client.country ?? 'South Africa',
-      status: client.status, notes: client.notes ?? '',
-    })
-    setModalOpen(true)
-  }
-
-  const handleSave = (data: FormData) => {
-    if (editClient) {
-      setClients(cs => cs.map(c => c.id === editClient.id
-        ? { ...c, ...data, phone: data.phone || null, company: data.company || null, address: data.address || null, city: data.city || null, country: data.country || null, notes: data.notes || null, updated_at: new Date().toISOString() }
-        : c
-      ))
-      toast.success('Client updated')
-    } else {
-      const newClient: Client = {
-        id: `client-${Date.now()}`,
-        lead_id: null,
-        name: data.name, email: data.email,
-        phone: data.phone || null, company: data.company || null,
-        address: data.address || null, city: data.city || null, country: data.country || null,
-        status: data.status, avatar_url: null, notes: data.notes || null,
-        created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      }
-      setClients(cs => [newClient, ...cs])
-      toast.success('Client added')
-    }
-    setModalOpen(false)
-  }
-
-  return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">Clients</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{clients.length} clients total</p>
-        </div>
-        <button
-          onClick={openAdd}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0D99FF] hover:bg-[#007BE5] text-white rounded-lg text-xs font-semibold transition-all shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          Add Client
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-4 flex items-center gap-4 shadow-xs">
-          <div className="w-10 h-10 bg-[#0ACF83]/10 rounded-xl flex items-center justify-center">
-            <Users className="w-5 h-5 text-[#0ACF83]" />
-          </div>
-          <div>
-            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Active Clients</p>
-            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{stats.active}</p>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-4 flex items-center gap-4 shadow-xs">
-          <div className="w-10 h-10 bg-slate-100 dark:bg-[#333333] rounded-xl flex items-center justify-center">
-            <User className="w-5 h-5 text-slate-400" />
-          </div>
-          <div>
-            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Inactive / Other</p>
-            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{stats.inactive}</p>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-4 flex items-center gap-4 shadow-xs">
-          <div className="w-10 h-10 bg-[#0ACF83]/10 rounded-xl flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-[#0ACF83]" />
-          </div>
-          <div>
-            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Total Revenue</p>
-            <p className="text-xl font-bold text-[#0ACF83]">{formatCurrency(totalRevenue)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D99FF]"
-            placeholder="Search clients..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="relative">
-          <select
-            className="appearance-none pl-3 pr-8 py-2 bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-700 dark:text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D99FF] cursor-pointer"
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All Statuses</option>
-            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-        </div>
-      </div>
-
-      {/* Client Grid */}
-      {filtered.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl py-20 flex flex-col items-center gap-3">
-          <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center">
-            <Users className="w-6 h-6 text-slate-600" />
-          </div>
-          <p className="text-slate-400 font-medium">No clients found</p>
-          <p className="text-slate-600 text-sm">Try adjusting your filters or add a new client</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map(client => (
-            <ClientCard
-              key={client.id}
-              client={client}
-              onEdit={openEdit}
-              totalRevenue={revenueByClient[client.id] ?? 0}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Modal */}
-      <ClientModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSave}
-        initial={formInitial}
-        title={editClient ? 'Edit Client' : 'Add New Client'}
-      />
     </div>
   )
 }
