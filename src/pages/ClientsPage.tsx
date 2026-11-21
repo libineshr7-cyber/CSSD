@@ -63,7 +63,7 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
   )
 }
 
-const inputCls = 'w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+const inputCls = 'w-full px-3 py-2 bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D99FF] focus:border-transparent'
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
@@ -89,12 +89,12 @@ function ClientModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="relative bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
-          <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors">
+        <div className="flex items-center justify-between p-6 border-b border-[#E5E5E5] dark:border-[#383838]">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -164,7 +164,7 @@ function ClientCard({ client, onEdit, totalRevenue }: { client: Client; onEdit: 
   const avatarCls = getAvatarColor(client.id)
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-colors flex flex-col gap-4">
+    <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-5 hover:border-slate-300 dark:hover:border-slate-600 shadow-xs hover:shadow-md transition-all flex flex-col gap-4">
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -314,7 +314,7 @@ export default function ClientsPage() {
         </div>
         <button
           onClick={openAdd}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-blue-600/20"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0D99FF] hover:bg-[#007BE5] text-white rounded-lg text-xs font-semibold transition-all shadow-xs"
         >
           <Plus className="w-4 h-4" />
           Add Client
@@ -323,31 +323,31 @@ export default function ClientsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center">
-            <Users className="w-5 h-5 text-green-400" />
+        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-4 flex items-center gap-4 shadow-xs">
+          <div className="w-10 h-10 bg-[#0ACF83]/10 rounded-xl flex items-center justify-center">
+            <Users className="w-5 h-5 text-[#0ACF83]" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Active Clients</p>
-            <p className="text-2xl font-bold text-slate-100">{stats.active}</p>
+            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Active Clients</p>
+            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{stats.active}</p>
           </div>
         </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 bg-slate-500/10 rounded-xl flex items-center justify-center">
+        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-4 flex items-center gap-4 shadow-xs">
+          <div className="w-10 h-10 bg-slate-100 dark:bg-[#333333] rounded-xl flex items-center justify-center">
             <User className="w-5 h-5 text-slate-400" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Inactive / Other</p>
-            <p className="text-2xl font-bold text-slate-100">{stats.inactive}</p>
+            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Inactive / Other</p>
+            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{stats.inactive}</p>
           </div>
         </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-emerald-400" />
+        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-4 flex items-center gap-4 shadow-xs">
+          <div className="w-10 h-10 bg-[#0ACF83]/10 rounded-xl flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-[#0ACF83]" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Total Revenue</p>
-            <p className="text-xl font-bold text-emerald-400">{formatCurrency(totalRevenue)}</p>
+            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Total Revenue</p>
+            <p className="text-xl font-bold text-[#0ACF83]">{formatCurrency(totalRevenue)}</p>
           </div>
         </div>
       </div>
@@ -355,9 +355,9 @@ export default function ClientsPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
-            className="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D99FF]"
             placeholder="Search clients..."
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -365,7 +365,7 @@ export default function ClientsPage() {
         </div>
         <div className="relative">
           <select
-            className="appearance-none pl-3 pr-8 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            className="appearance-none pl-3 pr-8 py-2 bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-700 dark:text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D99FF] cursor-pointer"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
           >
@@ -374,7 +374,7 @@ export default function ClientsPage() {
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
         </div>
       </div>
 

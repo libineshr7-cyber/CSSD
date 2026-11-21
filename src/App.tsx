@@ -3,7 +3,11 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import AppLayout from './components/layout/AppLayout'
+import PublicHomePage from './pages/public/PublicHomePage'
 import LoginPage from './pages/LoginPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import AdminProfilePage from './pages/AdminProfilePage'
 import OverviewPage from './pages/OverviewPage'
 import LeadsPage from './pages/LeadsPage'
 import ClientsPage from './pages/ClientsPage'
@@ -24,59 +28,127 @@ import TicketsPage from './pages/TicketsPage'
 import DocumentsPage from './pages/DocumentsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
-  if (loading) return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Loading CapeSecure BMS...</p>
-      </div>
-    </div>
-  )
-  if (!user) return <Navigate to="/login" replace />
-  return <>{children}</>
-}
+import UnauthorizedPage from './pages/UnauthorizedPage'
+import ProtectedRoute from './components/auth/ProtectedRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 
 function AppRoutes() {
   const { user } = useAuth()
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/" element={
+      {/* ── CapeSecure Public Website ── */}
+      <Route path="/" element={<PublicHomePage />} />
+
+      {/* ── Auth Flow Routes ── */}
+      <Route path="/login" element={user ? <Navigate to="/admin" replace /> : <LoginPage />} />
+      <Route path="/admin/login" element={user ? <Navigate to="/admin" replace /> : <LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+      {/* ── Protected Admin Application Area (/admin) with RBAC ── */}
+      <Route path="/admin" element={
         <ProtectedRoute>
           <AppLayout />
         </ProtectedRoute>
       }>
         <Route index element={<OverviewPage />} />
-        <Route path="leads" element={<LeadsPage />} />
-        <Route path="clients" element={<ClientsPage />} />
-        <Route path="requirements" element={<RequirementsPage />} />
-        <Route path="quotations" element={<QuotationsPage />} />
-        <Route path="agreements" element={<AgreementsPage />} />
-        <Route path="payments" element={<PaymentsPage />} />
-        <Route path="invoices" element={<InvoicesPage />} />
-        <Route path="projects" element={<ProjectsPage />} />
-        <Route path="tasks" element={<TasksPage />} />
-        <Route path="design-approvals" element={<DesignApprovalsPage />} />
-        <Route path="testing" element={<TestingPage />} />
-        <Route path="deployments" element={<DeploymentsPage />} />
-        <Route path="handover" element={<HandoverPage />} />
-        <Route path="maintenance" element={<MaintenancePage />} />
-        <Route path="monitoring" element={<MonitoringPage />} />
-        <Route path="tickets" element={<TicketsPage />} />
-        <Route path="documents" element={<DocumentsPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        
+        {/* Profile */}
+        <Route path="profile" element={<AdminProfilePage />} />
+
+        {/* Business Modules with RBAC */}
+        <Route path="leads" element={
+          <ProtectedRoute requiredModule="leads"><LeadsPage /></ProtectedRoute>
+        } />
+        <Route path="clients" element={
+          <ProtectedRoute requiredModule="clients"><ClientsPage /></ProtectedRoute>
+        } />
+        <Route path="requirements" element={
+          <ProtectedRoute requiredModule="requirements"><RequirementsPage /></ProtectedRoute>
+        } />
+        <Route path="quotations" element={
+          <ProtectedRoute requiredModule="quotations"><QuotationsPage /></ProtectedRoute>
+        } />
+        <Route path="agreements" element={
+          <ProtectedRoute requiredModule="agreements"><AgreementsPage /></ProtectedRoute>
+        } />
+
+        {/* Finance Modules with Strict Role-Based Access */}
+        <Route path="payments" element={
+          <ProtectedRoute requiredModule="payments"><PaymentsPage /></ProtectedRoute>
+        } />
+        <Route path="invoices" element={
+          <ProtectedRoute requiredModule="invoices"><InvoicesPage /></ProtectedRoute>
+        } />
+
+        {/* Production & Operations Modules with RBAC */}
+        <Route path="projects" element={
+          <ProtectedRoute requiredModule="projects"><ProjectsPage /></ProtectedRoute>
+        } />
+        <Route path="tasks" element={
+          <ProtectedRoute requiredModule="tasks"><TasksPage /></ProtectedRoute>
+        } />
+        <Route path="design-approvals" element={
+          <ProtectedRoute requiredModule="design-approvals"><DesignApprovalsPage /></ProtectedRoute>
+        } />
+        <Route path="testing" element={
+          <ProtectedRoute requiredModule="testing"><TestingPage /></ProtectedRoute>
+        } />
+        <Route path="deployments" element={
+          <ProtectedRoute requiredModule="deployments"><DeploymentsPage /></ProtectedRoute>
+        } />
+        <Route path="handover" element={
+          <ProtectedRoute requiredModule="handover"><HandoverPage /></ProtectedRoute>
+        } />
+        <Route path="maintenance" element={
+          <ProtectedRoute requiredModule="maintenance"><MaintenancePage /></ProtectedRoute>
+        } />
+        <Route path="monitoring" element={
+          <ProtectedRoute requiredModule="monitoring"><MonitoringPage /></ProtectedRoute>
+        } />
+        <Route path="tickets" element={
+          <ProtectedRoute requiredModule="tickets"><TicketsPage /></ProtectedRoute>
+        } />
+        <Route path="documents" element={
+          <ProtectedRoute requiredModule="documents"><DocumentsPage /></ProtectedRoute>
+        } />
+        <Route path="reports" element={
+          <ProtectedRoute requiredModule="reports"><ReportsPage /></ProtectedRoute>
+        } />
+        <Route path="settings" element={
+          <ProtectedRoute requiredModule="settings"><SettingsPage /></ProtectedRoute>
+        } />
       </Route>
+
+      {/* ── Backward-compatible Aliases ── */}
+      <Route path="/leads" element={<Navigate to="/admin/leads" replace />} />
+      <Route path="/clients" element={<Navigate to="/admin/clients" replace />} />
+      <Route path="/requirements" element={<Navigate to="/admin/requirements" replace />} />
+      <Route path="/quotations" element={<Navigate to="/admin/quotations" replace />} />
+      <Route path="/agreements" element={<Navigate to="/admin/agreements" replace />} />
+      <Route path="/payments" element={<Navigate to="/admin/payments" replace />} />
+      <Route path="/invoices" element={<Navigate to="/admin/invoices" replace />} />
+      <Route path="/projects" element={<Navigate to="/admin/projects" replace />} />
+      <Route path="/tasks" element={<Navigate to="/admin/tasks" replace />} />
+      <Route path="/design-approvals" element={<Navigate to="/admin/design-approvals" replace />} />
+      <Route path="/testing" element={<Navigate to="/admin/testing" replace />} />
+      <Route path="/deployments" element={<Navigate to="/admin/deployments" replace />} />
+      <Route path="/handover" element={<Navigate to="/admin/handover" replace />} />
+      <Route path="/maintenance" element={<Navigate to="/admin/maintenance" replace />} />
+      <Route path="/monitoring" element={<Navigate to="/admin/monitoring" replace />} />
+      <Route path="/tickets" element={<Navigate to="/admin/tickets" replace />} />
+      <Route path="/documents" element={<Navigate to="/admin/documents" replace />} />
+      <Route path="/reports" element={<Navigate to="/admin/reports" replace />} />
+      <Route path="/settings" element={<Navigate to="/admin/settings" replace />} />
+      <Route path="/profile" element={<Navigate to="/admin/profile" replace />} />
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
-
-import ErrorBoundary from './components/ErrorBoundary'
 
 export default function App() {
   return (
@@ -86,27 +158,27 @@ export default function App() {
           <BrowserRouter>
             <AppRoutes />
             <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#1e293b',
-                color: '#f8fafc',
-                border: '1px solid #334155',
-                borderRadius: '10px',
-                fontSize: '14px',
-              },
-              success: {
-                iconTheme: { primary: '#10b981', secondary: '#fff' },
-              },
-              error: {
-                iconTheme: { primary: '#ef4444', secondary: '#fff' },
-              },
-            }}
-          />
-        </BrowserRouter>
-      </AuthProvider>
-    </ThemeProvider>
-  </ErrorBoundary>
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#252525',
+                  color: '#f5f5f5',
+                  border: '1px solid #383838',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                },
+                success: {
+                  iconTheme: { primary: '#0ACF83', secondary: '#fff' },
+                },
+                error: {
+                  iconTheme: { primary: '#F24E1E', secondary: '#fff' },
+                },
+              }}
+            />
+          </BrowserRouter>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   )
 }

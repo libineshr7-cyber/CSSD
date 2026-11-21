@@ -2,43 +2,67 @@
 
 @layer base {
   :root {
-    --bg-primary: #ffffff;
+    --bg-canvas: #f5f5f5;
+    --bg-surface: #ffffff;
+    --bg-panel: #ffffff;
     --bg-secondary: #f8fafc;
     --bg-tertiary: #f1f5f9;
-    --border: #e2e8f0;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --accent: #2563eb;
-    --accent-hover: #1d4ed8;
-    --sidebar-bg: #0f172a;
-    --sidebar-text: #cbd5e1;
-    --sidebar-hover: #1e293b;
-    --sidebar-active: #2563eb;
+    --border: #e5e5e5;
+    --border-subtle: #f0f0f0;
+    --text-primary: #1e1e1e;
+    --text-secondary: #575757;
+    --text-muted: #8c8c8c;
+    --figma-blue: #0d99ff;
+    --figma-blue-hover: #007be5;
+    --figma-purple: #a259ff;
+    --figma-green: #0acf83;
+    --figma-red: #f24e1e;
+    --figma-yellow: #ffc700;
+    --sidebar-bg: #2c2c2c;
+    --sidebar-text: #e0e0e0;
+    --sidebar-hover: #383838;
+    --sidebar-active: #0d99ff;
   }
 
   .dark {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-tertiary: #334155;
-    --border: #334155;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    --accent: #3b82f6;
-    --accent-hover: #2563eb;
-    --sidebar-bg: #020617;
-    --sidebar-text: #94a3b8;
-    --sidebar-hover: #0f172a;
-    --sidebar-active: #3b82f6;
+    --bg-canvas: #1e1e1e;
+    --bg-surface: #2c2c2c;
+    --bg-panel: #252525;
+    --bg-secondary: #252525;
+    --bg-tertiary: #383838;
+    --border: #383838;
+    --border-subtle: #2e2e2e;
+    --text-primary: #f5f5f5;
+    --text-secondary: #a3a3a3;
+    --text-muted: #737373;
+    --figma-blue: #0d99ff;
+    --figma-blue-hover: #38bdf8;
+    --figma-purple: #a259ff;
+    --figma-green: #0acf83;
+    --figma-red: #f24e1e;
+    --figma-yellow: #ffc700;
+    --sidebar-bg: #181818;
+    --sidebar-text: #a3a3a3;
+    --sidebar-hover: #262626;
+    --sidebar-active: #0d99ff;
   }
 
   * {
-    @apply border-slate-200 dark:border-slate-700;
+    @apply border-[#e5e5e5] dark:border-[#383838];
   }
 
   body {
-    @apply bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased;
+    @apply bg-[#f5f5f5] dark:bg-[#1e1e1e] text-[#1e1e1e] dark:text-[#f5f5f5] font-sans antialiased selection:bg-[#0d99ff]/20 selection:text-[#0d99ff];
+  }
+
+  /* Authentic Figma Canvas Dot Pattern */
+  .figma-canvas-dots {
+    background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .dark .figma-canvas-dots {
+    background-image: radial-gradient(circle, #333333 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 
   ::-webkit-scrollbar {
@@ -49,67 +73,72 @@
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+    @apply bg-slate-300 dark:bg-[#404040] rounded-full;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-500;
+    @apply bg-slate-400 dark:bg-[#525252];
   }
 }
 
 @layer components {
-  .card {
-    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm;
+  /* Figma Card with subtle craft shadow and precision border */
+  .card, .figma-card {
+    @apply bg-white dark:bg-[#2c2c2c] border border-[#e5e5e5] dark:border-[#383838] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-150;
   }
 
-  .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  .card:hover, .figma-card:hover {
+    @apply border-slate-300 dark:border-[#4d4d4d];
   }
 
-  .btn-secondary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 transition-colors duration-150;
+  .btn-primary, .figma-btn-primary {
+    @apply inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#0d99ff] hover:bg-[#007be5] text-white text-xs font-semibold rounded-lg shadow-sm active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#0d99ff]/50;
+  }
+
+  .btn-secondary, .figma-btn-secondary {
+    @apply inline-flex items-center gap-2 px-3.5 py-1.5 bg-white dark:bg-[#2c2c2c] hover:bg-slate-50 dark:hover:bg-[#383838] text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg border border-[#e5e5e5] dark:border-[#383838] shadow-xs active:scale-95 transition-all duration-150;
   }
 
   .btn-danger {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors duration-150;
+    @apply inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#f24e1e] hover:bg-red-700 text-white text-xs font-medium rounded-lg shadow-sm transition-all duration-150 active:scale-95;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-sm font-medium rounded-lg transition-colors duration-150;
+    @apply inline-flex items-center gap-2 px-2.5 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors duration-150;
   }
 
   .input {
-    @apply w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all;
+    @apply w-full px-3 py-2 bg-white dark:bg-[#252525] border border-[#e5e5e5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0d99ff] focus:border-transparent transition-all;
   }
 
   .label {
-    @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1;
+    @apply block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 tracking-tight;
   }
 
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium tracking-tight;
   }
 
-  .badge-blue   { @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300; }
-  .badge-green  { @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300; }
-  .badge-yellow { @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300; }
-  .badge-red    { @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300; }
-  .badge-purple { @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300; }
-  .badge-gray   { @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300; }
+  .badge-blue   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#0d99ff]/10 text-[#0d99ff] border border-[#0d99ff]/20; }
+  .badge-green  { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#0acf83]/10 text-[#0acf83] border border-[#0acf83]/20; }
+  .badge-yellow { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#ffc700]/15 text-amber-700 dark:text-[#ffc700] border border-[#ffc700]/25; }
+  .badge-red    { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#f24e1e]/10 text-[#f24e1e] border border-[#f24e1e]/20; }
+  .badge-purple { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#a259ff]/10 text-[#a259ff] border border-[#a259ff]/20; }
+  .badge-gray   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-[#333333] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700; }
 
   .table-wrapper {
-    @apply overflow-x-auto;
+    @apply overflow-x-auto rounded-xl border border-[#e5e5e5] dark:border-[#383838] bg-white dark:bg-[#2c2c2c];
   }
 
   .table {
-    @apply w-full text-sm;
+    @apply w-full text-xs;
   }
 
   .table th {
-    @apply px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700;
+    @apply px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-[#e5e5e5] dark:border-[#383838] bg-slate-50/70 dark:bg-[#252525]/70;
   }
 
   .table td {
-    @apply px-4 py-3 text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800;
+    @apply px-4 py-2.5 text-slate-700 dark:text-slate-300 border-b border-[#f0f0f0] dark:border-[#333333];
   }
 
   .table tr:last-child td {
@@ -117,11 +146,11 @@
   }
 
   .table tr:hover td {
-    @apply bg-slate-50 dark:bg-slate-800/50;
+    @apply bg-slate-50/80 dark:bg-[#333333]/40;
   }
 
   .stat-card {
-    @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-5 flex flex-col gap-3;
+    @apply bg-white dark:bg-[#2c2c2c] border border-[#e5e5e5] dark:border-[#383838] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5;
   }
 
   .page-header {
@@ -129,15 +158,15 @@
   }
 
   .page-title {
-    @apply text-2xl font-bold text-slate-900 dark:text-slate-100;
+    @apply text-xl font-bold text-slate-900 dark:text-[#f5f5f5] tracking-tight;
   }
 
   .page-subtitle {
-    @apply text-sm text-slate-500 dark:text-slate-400 mt-0.5;
+    @apply text-xs text-slate-500 dark:text-slate-400 mt-0.5;
   }
 
   .section-title {
-    @apply text-lg font-semibold text-slate-800 dark:text-slate-200;
+    @apply text-sm font-semibold text-slate-800 dark:text-slate-200;
   }
 
   .form-group {
@@ -145,14 +174,6 @@
   }
 
   .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer;
-  }
-
-  .sidebar-link-inactive {
-    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer text-slate-400 hover:text-slate-200 hover:bg-slate-800;
-  }
-
-  .sidebar-link-active {
-    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer text-white bg-blue-600;
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer;
   }
 }

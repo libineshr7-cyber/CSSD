@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
+import { ROLE_LABELS, type AppRole, type NavModule } from '../types/database';
+import { DEFAULT_ROLE_PERMISSIONS } from '../lib/permissions';
 import {
   Settings,
   Building2,
@@ -30,6 +33,7 @@ type SidebarSection =
   | 'general'
   | 'company'
   | 'team'
+  | 'permissions'
   | 'email'
   | 'integrations'
   | 'billing'
@@ -109,10 +113,11 @@ const NAV_ITEMS: { key: SidebarSection; label: string; icon: React.ReactNode }[]
   { key: 'general', label: 'General', icon: <Settings size={16} /> },
   { key: 'company', label: 'Company Profile', icon: <Building2 size={16} /> },
   { key: 'team', label: 'Team Members', icon: <Users size={16} /> },
+  { key: 'permissions', label: 'Roles & Permissions', icon: <Shield size={16} /> },
   { key: 'email', label: 'Email Configuration', icon: <Mail size={16} /> },
   { key: 'integrations', label: 'Integrations', icon: <Plug size={16} /> },
   { key: 'billing', label: 'Billing', icon: <CreditCard size={16} /> },
-  { key: 'security', label: 'Security', icon: <Shield size={16} /> },
+  { key: 'security', label: 'Security', icon: <Key size={16} /> },
   { key: 'audit', label: 'Audit Log', icon: <ClipboardList size={16} /> },
 ];
 
@@ -253,9 +258,11 @@ const CompanySection: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl">
-              CS
-            </div>
+            <img
+              src="/logo.png"
+              alt="CapeSecure Company Logo"
+              className="w-16 h-16 rounded-xl object-contain border border-[#E5E5E5] dark:border-[#383838] p-1 bg-white dark:bg-[#2C2C2C] shadow-sm"
+            />
             <button className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
               <Upload size={15} />
               Upload Logo
@@ -817,12 +824,196 @@ const AuditSection: React.FC = () => {
   );
 };
 
+// ─── Configurable Permissions Section ─────────────────────────────────────────
+
+const MODULE_LIST: NavModule[] = [
+  'overview', 'leads', 'clients', 'requirements', 'quotations', 'agreements',
+  'payments', 'invoices', 'projects', 'tasks', 'design-approvals', 'testing',
+  'deployments', 'handover', 'maintenance', 'monitoring', 'tickets', 'documents',
+  'reports', 'settings'
+];
+
+const PermissionsSection: React.FC = () => {
+  const { role: userRole, permissions, updateRolePermission } = useAuth();
+  const [selectedRole, setSelectedRole] = useState<AppRole>('project_manager');
+  const [matrix, setMatrix] = useState<Record<NavModule, { view: boolean; create: boolean; edit: boolean; delete: boolean }>>(() => {
+    return { ...DEFAULT_ROLE_PERMISSIONS.project_manager };
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    // Load custom permissions from state or defaults
+    const defaults = { ...DEFAULT_ROLE_PERMISSIONS[selectedRole] };
+    const roleCustom = permissions.filter(p => p.role === selectedRole);
+    roleCustom.forEach(p => {
+      if (defaults[p.module]) {
+        defaults[p.module] = {
+          view: p.can_view,
+          create: p.can_create,
+          edit: p.can_edit,
+          delete: p.can_delete,
+        };
+      }
+    });
+    setMatrix(defaults);
+  }, [selectedRole, permissions]);
+
+  const toggle = (mod: NavModule, action: 'view' | 'create' | 'edit' | 'delete') => {
+    if (userRole !== 'super_admin') {
+      toast.error('Only Super Admins can alter role permission policies.');
+      return;
+    }
+    setMatrix(prev => ({
+      ...prev,
+      [mod]: {
+        ...prev[mod],
+        [action]: !prev[mod][action],
+      },
+    }));
+  };
+
+  const handleSave = async () => {
+    if (userRole !== 'super_admin') {
+      toast.error('Permission denied: Super Admin role required to commit policy updates.');
+      return;
+    }
+
+    setSaving(true);
+    let successCount = 0;
+    for (const mod of MODULE_LIST) {
+      const perms = matrix[mod];
+      const { error } = await updateRolePermission(selectedRole, mod, {
+        can_view: perms.view,
+        can_create: perms.create,
+        can_edit: perms.edit,
+        can_delete: perms.delete,
+      });
+      if (!error) successCount++;
+    }
+    setSaving(false);
+    toast.success(`Role policies for ${ROLE_LABELS[selectedRole].label} updated (${successCount} modules synced).`);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <SectionTitle
+          title="Configurable Roles & Permissions"
+          subtitle="Define database Row Level Security policies and module access matrices."
+        />
+        {userRole === 'super_admin' && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <Save size={14} />
+            {saving ? 'Syncing Policies...' : 'Save Role Matrix'}
+          </button>
+        )}
+      </div>
+
+      {/* Role Selector Tabs */}
+      <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 rounded-xl">
+        {(Object.keys(ROLE_LABELS) as AppRole[]).map(r => (
+          <button
+            key={r}
+            onClick={() => setSelectedRole(r)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              selectedRole === r
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {ROLE_LABELS[r].label}
+          </button>
+        ))}
+      </div>
+
+      {/* Role Info Box */}
+      <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-900 space-y-1">
+        <div className="font-bold flex items-center gap-2">
+          <span>{ROLE_LABELS[selectedRole].label}</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full border ${ROLE_LABELS[selectedRole].badge}`}>Active Policy</span>
+        </div>
+        <p className="text-blue-700">{ROLE_LABELS[selectedRole].description}</p>
+      </div>
+
+      {/* Permissions Matrix Table */}
+      <div className="overflow-x-auto border border-gray-200 rounded-xl">
+        <table className="min-w-full divide-y divide-gray-200 text-xs">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Module</th>
+              <th className="px-4 py-3 text-center font-semibold text-gray-600 w-24">Can View</th>
+              <th className="px-4 py-3 text-center font-semibold text-gray-600 w-24">Can Create</th>
+              <th className="px-4 py-3 text-center font-semibold text-gray-600 w-24">Can Edit</th>
+              <th className="px-4 py-3 text-center font-semibold text-gray-600 w-24">Can Delete</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 bg-white">
+            {MODULE_LIST.map(mod => {
+              const rule = matrix[mod] || { view: false, create: false, edit: false, delete: false };
+              const isLocked = selectedRole === 'super_admin';
+
+              return (
+                <tr key={mod} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5 font-medium text-gray-900 capitalize">
+                    {mod.replace('-', ' ')}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={rule.view}
+                      disabled={isLocked}
+                      onChange={() => toggle(mod, 'view')}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={rule.create}
+                      disabled={isLocked}
+                      onChange={() => toggle(mod, 'create')}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={rule.edit}
+                      disabled={isLocked}
+                      onChange={() => toggle(mod, 'edit')}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={rule.delete}
+                      disabled={isLocked}
+                      onChange={() => toggle(mod, 'delete')}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main SettingsPage ────────────────────────────────────────────────────────
 
 const SECTION_MAP: Record<SidebarSection, React.ReactNode> = {
   general: <GeneralSection />,
   company: <CompanySection />,
   team: <TeamSection />,
+  permissions: <PermissionsSection />,
   email: <EmailSection />,
   integrations: <IntegrationsSection />,
   billing: <BillingSection />,

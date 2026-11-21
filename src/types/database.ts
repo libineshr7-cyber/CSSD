@@ -70,7 +70,17 @@ export interface Database {
       audit_logs: {
         Row: AuditLog
         Insert: Omit<AuditLog, 'id' | 'created_at'>
-        Update: never
+        Update: Partial<Omit<AuditLog, 'id' | 'created_at'>>
+      }
+      admin_profiles: {
+        Row: AdminProfile
+        Insert: Partial<AdminProfile> & { id: string; email: string }
+        Update: Partial<AdminProfile>
+      }
+      role_permissions: {
+        Row: RolePermission
+        Insert: RolePermission
+        Update: Partial<RolePermission>
       }
     }
     Views: Record<string, never>
@@ -352,3 +362,63 @@ export type NavModule =
   | 'documents'
   | 'reports'
   | 'settings'
+
+export type AppRole =
+  | 'super_admin'
+  | 'administrator'
+  | 'project_manager'
+  | 'finance_manager'
+  | 'technical_staff'
+
+export interface AdminProfile {
+  id: string
+  email: string
+  full_name: string
+  role: AppRole
+  phone: string | null
+  avatar_url: string | null
+  is_active: boolean
+  last_login: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RolePermission {
+  role: AppRole
+  module: NavModule
+  can_view: boolean
+  can_create: boolean
+  can_edit: boolean
+  can_delete: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export const ROLE_LABELS: Record<AppRole, { label: string; badge: string; description: string }> = {
+  super_admin: {
+    label: 'Super Admin',
+    badge: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30',
+    description: 'Unrestricted master access to all operations, security configurations, and audit controls.',
+  },
+  administrator: {
+    label: 'Administrator',
+    badge: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
+    description: 'Full administrative access across clients, projects, finances, and operational teams.',
+  },
+  project_manager: {
+    label: 'Project Manager',
+    badge: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+    description: 'Oversees development cycles, sprints, client requirements, milestones, and handovers.',
+  },
+  finance_manager: {
+    label: 'Finance Manager',
+    badge: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+    description: 'Manages billing, invoices, quotation approvals, agreements, and revenue analytics.',
+  },
+  technical_staff: {
+    label: 'Technical Staff',
+    badge: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
+    description: 'Engineering access to tasks, QA test suites, deployments, monitoring, and ticket triage.',
+  },
+}
+
