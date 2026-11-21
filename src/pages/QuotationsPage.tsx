@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { demoQuotations, demoClients } from '../data/demoData'
 import { supabase } from '../lib/supabase'
-import { openPrintableQuotation, downloadQuotationHTML } from '../lib/pdfGenerator'
+import { openPrintableQuotation, downloadQuotationPDF, downloadQuotationHTML } from '../lib/pdfGenerator'
 import { sendQuotationEmail } from '../lib/emailService'
 import type { Quotation, QuotationItem, QuotationStatus, Client, PaymentMilestone } from '../types/database'
 
@@ -347,11 +347,11 @@ export default function QuotationsPage() {
     }
   }
 
-  // Download PDF / HTML
+  // Download genuine binary PDF
   const handleDownload = (quote: Quotation) => {
     const client = clients.find(c => c.id === quote.client_id)
-    downloadQuotationHTML(quote, client)
-    toast.success(`Downloaded Quotation ${quote.quote_number}`)
+    downloadQuotationPDF(quote, client)
+    toast.success(`Downloaded PDF for Quotation ${quote.quote_number}`)
   }
 
   // Copy Quotation Link

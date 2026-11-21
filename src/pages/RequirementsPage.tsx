@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { demoClients, demoLeads } from '../data/demoData'
 import { supabase } from '../lib/supabase'
-import { openPrintableRequirementSummary, downloadRequirementHTML } from '../lib/pdfGenerator'
+import { openPrintableRequirementSummary, downloadRequirementPDF, downloadRequirementHTML } from '../lib/pdfGenerator'
 import type { Requirement, Client, Lead, RequirementReference, RequirementAttachment } from '../types/database'
 
 // ─── Constants & Options ──────────────────────────────────────────────────────
@@ -337,8 +337,8 @@ export default function RequirementsPage() {
   const handleDownloadDoc = (req: Requirement) => {
     const client = clients.find(c => c.id === req.client_id)
     const lead = leads.find(l => l.id === req.lead_id)
-    downloadRequirementHTML({ requirement: req, client, lead })
-    toast.success('Downloaded requirement summary specification!')
+    downloadRequirementPDF({ requirement: req, client, lead })
+    toast.success('Downloaded requirement specification PDF!')
   }
 
   // ─── Render ─────────────────────────────────────────────────────────────────

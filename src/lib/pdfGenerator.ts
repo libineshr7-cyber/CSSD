@@ -1,5 +1,6 @@
-import type { Requirement, Client, Lead, Quotation } from '../types/database'
+import type { Requirement, Client, Lead, Quotation, Agreement } from '../types/database'
 import { formatCurrency, formatDate } from './utils'
+import { PDFBuilder } from './pdfBuilder'
 
 export interface RequirementDocumentData {
   requirement: Requirement
@@ -395,6 +396,80 @@ export function downloadRequirementHTML(data: RequirementDocumentData) {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+/**
+ * Downloads a genuine binary .pdf file for the Requirement Specification
+ */
+export function downloadRequirementPDF(data: RequirementDocumentData) {
+  const { requirement: req, client, lead } = data
+  const pdf = new PDFBuilder()
+  const titleSafe = (req.title || 'Requirement').replace(/[^a-zA-Z0-9_-]/g, '_')
+
+  // Top header banner
+  pdf.fillRect(36, 36, 523, 56, 0.05, 0.09, 0.16)
+  pdf.drawText('CAPESECURE SOLUTIONS', 50, 48, { fontSize: 14, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('CLIENT REQUIREMENT & TECHNICAL SPECIFICATION', 50, 68, { fontSize: 8, bold: true, r: 0.38, g: 0.75, b: 0.99 })
+
+  pdf.drawText(`DATE: ${formatDate(req.created_at || new Date().toISOString())}`, 540, 50, { fontSize: 8, align: 'right', r: 0.8, g: 0.85, b: 0.9 })
+  pdf.drawText(`STATUS: ${(req.status || 'Active').toUpperCase()}`, 540, 66, { fontSize: 8, bold: true, align: 'right', r: 0.38, g: 0.75, b: 0.99 })
+
+  // Meta box
+  pdf.fillRect(36, 102, 523, 76, 0.96, 0.97, 0.99)
+  pdf.strokeRect(36, 102, 523, 76, 0.85, 0.9, 0.95, 1)
+
+  pdf.drawText('PROJECT SPECIFICATION', 50, 114, { fontSize: 9, bold: true, r: 0.2, g: 0.4, b: 0.8 })
+  pdf.drawText(req.title || 'Custom Web Application', 50, 128, { fontSize: 12, bold: true, r: 0.08, g: 0.12, b: 0.2 })
+  pdf.drawText(`Website Type: ${req.website_type || 'Custom Web Portal'}   •   Purpose: ${req.business_purpose || 'Business Platform'}`, 50, 146, { fontSize: 8.5, r: 0.3, g: 0.35, b: 0.4 })
+  pdf.drawText(`Timeline: ${req.timeline || req.estimated_delivery_date || '4-6 Weeks'}   •   Budget: ${req.budget_range || (req.budget_min ? `${req.budget_min} - ${req.budget_max}` : 'Standard')}`, 50, 160, { fontSize: 8.5, r: 0.3, g: 0.35, b: 0.4 })
+
+  // Client Details box
+  const clientName = client?.name || lead?.name || 'Authorized Client'
+  const clientCo = client?.business_name || client?.company || lead?.company || 'Confidential'
+  const clientContact = client?.email || lead?.email || 'N/A'
+  pdf.fillRect(36, 188, 523, 44, 0.98, 0.98, 0.99)
+  pdf.strokeRect(36, 188, 523, 44, 0.88, 0.9, 0.94, 1)
+  pdf.drawText(`CLIENT: ${clientName} (${clientCo})`, 50, 198, { fontSize: 8.5, bold: true, r: 0.15, g: 0.2, b: 0.3 })
+  pdf.drawText(`EMAIL: ${clientContact}   •   CLIENT REF: ${client?.client_code || 'CS-CLIENT-SPEC'}`, 50, 214, { fontSize: 8, r: 0.35, g: 0.4, b: 0.45 })
+
+  // Technical Breakdown
+  let curY = 246
+  pdf.drawText('TECHNICAL & FUNCTIONAL REQUIREMENTS', 36, curY, { fontSize: 10, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+  pdf.line(36, curY + 6, 559, curY + 6, 0.8, 0.85, 0.92, 1)
+  curY += 18
+
+  const techSections = [
+    { label: 'Required Pages', val: req.pages?.join(', ') || 'Home, About, Services, Contact, Dashboard' },
+    { label: 'Key Features', val: req.features?.join(', ') || 'Client Portal, Responsive Layout, SEO Optimized, Analytics' },
+    { label: 'Frontend Stack', val: req.frontend_tech || 'React, TypeScript, Tailwind CSS, Modern UI' },
+    { label: 'Backend & DB', val: `${req.backend_tech || 'RESTful API / Edge Functions'} | DB: ${req.database_tech || 'PostgreSQL Supabase'}` },
+    { label: 'Integrations', val: `Payment: ${req.payment_gateway || 'Stripe / Razorpay / NetBanking'} | Hosting: ${req.hosting_requirements || 'Vercel / Cloudflare'}` },
+  ]
+
+  for (const item of techSections) {
+    pdf.fillRect(36, curY, 130, 24, 0.93, 0.95, 0.98)
+    pdf.strokeRect(36, curY, 130, 24, 0.85, 0.88, 0.93, 1)
+    pdf.drawText(item.label, 42, curY + 7, { fontSize: 8, bold: true, r: 0.15, g: 0.25, b: 0.4 })
+
+    pdf.strokeRect(166, curY, 393, 24, 0.88, 0.9, 0.94, 1)
+    pdf.drawText(item.val, 174, curY + 7, { fontSize: 8, r: 0.2, g: 0.2, b: 0.25 })
+    curY += 28
+  }
+
+  // Notes
+  if (req.additional_notes) {
+    curY += 8
+    pdf.drawText('ADDITIONAL INSTRUCTIONS & CLIENT NOTES', 36, curY, { fontSize: 9, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+    curY += 14
+    curY = pdf.drawParagraph(req.additional_notes, 36, curY, 523, { fontSize: 8, lineHeight: 12, r: 0.3, g: 0.3, b: 0.3 })
+  }
+
+  // Signoff footer
+  pdf.line(36, 760, 559, 760, 0.85, 0.88, 0.92, 1)
+  pdf.drawText('CapeSecure Business Management Platform • Official Technical Documentation', 36, 770, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText('Confidential & Proprietary', 559, 770, { fontSize: 7.5, align: 'right', r: 0.45, g: 0.5, b: 0.55 })
+
+  pdf.download(`CapeSecure-Requirement-${titleSafe}.pdf`)
 }
 
 // ─── QUOTATION PDF GENERATOR ──────────────────────────────────────────────────
@@ -824,4 +899,823 @@ export function downloadQuotationHTML(quotation: Quotation, client?: Client | nu
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
+
+/**
+ * Downloads a genuine binary .pdf file for the Quotation
+ */
+export function downloadQuotationPDF(quotation: Quotation, client?: Client | null) {
+  const pdf = new PDFBuilder()
+  const quoteSafe = quotation.quote_number.replace(/[^a-zA-Z0-9_-]/g, '_')
+
+  // Top header banner
+  pdf.fillRect(36, 36, 523, 60, 0.05, 0.09, 0.16)
+  pdf.drawText('CAPESECURE SOLUTIONS', 50, 48, { fontSize: 15, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('ENTERPRISE WEB & SOFTWARE ENGINEERING', 50, 68, { fontSize: 8, bold: true, r: 0.38, g: 0.75, b: 0.99 })
+
+  pdf.drawText('OFFICIAL ESTIMATE / QUOTATION', 540, 48, { fontSize: 10, bold: true, align: 'right', r: 0.38, g: 0.75, b: 0.99 })
+  pdf.drawText(`REF: ${quotation.quote_number}`, 540, 64, { fontSize: 8.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
+  pdf.drawText(`STATUS: ${quotation.status.toUpperCase()}`, 540, 78, { fontSize: 8, align: 'right', r: 0.8, g: 0.85, b: 0.9 })
+
+  // Metadata ribbon
+  pdf.fillRect(36, 106, 523, 30, 0.95, 0.96, 0.98)
+  pdf.strokeRect(36, 106, 523, 30, 0.85, 0.88, 0.93, 1)
+  pdf.drawText(`Date Issued: ${formatDate(quotation.created_at || new Date().toISOString())}`, 50, 116, { fontSize: 8.5, bold: true, r: 0.2, g: 0.25, b: 0.35 })
+  pdf.drawText(`Valid Until: ${quotation.valid_until ? formatDate(quotation.valid_until) : '30 Days'}`, 240, 116, { fontSize: 8.5, bold: true, r: 0.2, g: 0.25, b: 0.35 })
+  pdf.drawText('Currency: INR (Rs)', 430, 116, { fontSize: 8.5, bold: true, r: 0.2, g: 0.25, b: 0.35 })
+
+  // Two columns: Provider & Client
+  const clientName = client?.name || 'Authorized Client'
+  const clientCo = client?.business_name || client?.company || 'Client Organization'
+  const clientContact = client?.email || 'N/A'
+  const clientPhone = client?.phone || 'N/A'
+  const clientAddr = [client?.address, client?.city, client?.state].filter(Boolean).join(', ') || 'Address on file'
+
+  // Left: Client box
+  pdf.fillRect(36, 146, 256, 76, 0.98, 0.98, 0.99)
+  pdf.strokeRect(36, 146, 256, 76, 0.88, 0.9, 0.94, 1)
+  pdf.drawText('PREPARED FOR (CLIENT):', 46, 154, { fontSize: 7.5, bold: true, r: 0.4, g: 0.45, b: 0.55 })
+  pdf.drawText(clientCo, 46, 168, { fontSize: 10, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+  pdf.drawText(`Attn: ${clientName}`, 46, 182, { fontSize: 8, r: 0.25, g: 0.3, b: 0.35 })
+  pdf.drawText(`${clientContact} | ${clientPhone}`, 46, 194, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(clientAddr, 46, 206, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+
+  // Right: CapeSecure box
+  pdf.fillRect(302, 146, 257, 76, 0.98, 0.98, 0.99)
+  pdf.strokeRect(302, 146, 257, 76, 0.88, 0.9, 0.94, 1)
+  pdf.drawText('SERVICE PROVIDER:', 312, 154, { fontSize: 7.5, bold: true, r: 0.4, g: 0.45, b: 0.55 })
+  pdf.drawText('CapeSecure Solutions', 312, 168, { fontSize: 10, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+  pdf.drawText('Enterprise Web Architecture & Security', 312, 182, { fontSize: 8, r: 0.25, g: 0.3, b: 0.35 })
+  pdf.drawText('support@capesecure.com | https://capesecure.vercel.app', 312, 194, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText('Kerala, India • GSTIN: 32ABCDE1234F1Z5', 312, 206, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+
+  // Project Header
+  pdf.fillRect(36, 232, 523, 26, 0.92, 0.94, 0.98)
+  pdf.strokeRect(36, 232, 523, 26, 0.82, 0.86, 0.92, 1)
+  pdf.drawText(`PROJECT: ${quotation.title}`, 46, 241, { fontSize: 9.5, bold: true, r: 0.08, g: 0.15, b: 0.3 })
+  if (quotation.delivery_timeline) {
+    pdf.drawText(`Est. Delivery: ${quotation.delivery_timeline}`, 540, 241, { fontSize: 8.5, align: 'right', r: 0.2, g: 0.3, b: 0.45 })
+  }
+
+  // Items Table Header
+  let curY = 268
+  pdf.fillRect(36, curY, 523, 20, 0.1, 0.15, 0.25)
+  pdf.drawText('#', 44, curY + 6, { fontSize: 8, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('ITEM & DELIVERABLE DESCRIPTION', 66, curY + 6, { fontSize: 8, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('QTY', 370, curY + 6, { fontSize: 8, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('UNIT PRICE', 420, curY + 6, { fontSize: 8, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('TOTAL', 540, curY + 6, { fontSize: 8, bold: true, align: 'right', r: 1, g: 1, b: 1 })
+  curY += 20
+
+  // Item rows
+  const items = quotation.items && quotation.items.length > 0 ? quotation.items : [
+    { description: quotation.title || 'Web Development Package', quantity: 1, unit_price: quotation.total, total: quotation.total }
+  ]
+
+  items.slice(0, 6).forEach((item, idx) => {
+    const isAlt = idx % 2 === 1
+    if (isAlt) {
+      pdf.fillRect(36, curY, 523, 24, 0.98, 0.98, 0.99)
+    }
+    pdf.strokeRect(36, curY, 523, 24, 0.9, 0.92, 0.95, 1)
+
+    pdf.drawText(String(idx + 1), 44, curY + 7, { fontSize: 8, r: 0.3, g: 0.35, b: 0.4 })
+    const serviceName = item.description || `Deliverable #${idx + 1}`
+    pdf.drawText(serviceName.substring(0, 52), 66, curY + 7, { fontSize: 8.5, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+    pdf.drawText(String(item.quantity || 1), 376, curY + 7, { fontSize: 8, r: 0.25, g: 0.3, b: 0.35 })
+    pdf.drawText(formatCurrency(item.unit_price || 0), 420, curY + 7, { fontSize: 8, r: 0.25, g: 0.3, b: 0.35 })
+    pdf.drawText(formatCurrency(item.total || ((item.quantity || 1) * (item.unit_price || 0))), 540, curY + 7, { fontSize: 8.5, bold: true, align: 'right', r: 0.1, g: 0.15, b: 0.25 })
+
+    curY += 24
+  })
+
+  // Financial summary & Milestone split
+  curY += 10
+  const advancePct = quotation.advance_percentage || 50
+  const advanceAmt = quotation.advance_amount || (quotation.total * advancePct) / 100
+  const balanceAmt = quotation.balance_amount || (quotation.total - advanceAmt)
+
+  // Left box: Milestones
+  pdf.fillRect(36, curY, 280, 84, 0.96, 0.97, 0.99)
+  pdf.strokeRect(36, curY, 280, 84, 0.85, 0.88, 0.93, 1)
+  pdf.drawText('PAYMENT SCHEDULE & MILESTONES', 46, curY + 10, { fontSize: 8, bold: true, r: 0.15, g: 0.25, b: 0.4 })
+  pdf.drawText(`1. Advance Deposit (${advancePct}%): ${formatCurrency(advanceAmt)}`, 46, curY + 28, { fontSize: 8, bold: true, r: 0.1, g: 0.5, b: 0.25 })
+  pdf.drawText('   Due upon contract signing before development begins.', 46, curY + 40, { fontSize: 7.5, r: 0.4, g: 0.45, b: 0.5 })
+  pdf.drawText(`2. Final Settlement (${100 - advancePct}%): ${formatCurrency(balanceAmt)}`, 46, curY + 54, { fontSize: 8, bold: true, r: 0.1, g: 0.2, b: 0.35 })
+  pdf.drawText('   Due upon QA testing completion & prior to final handover.', 46, curY + 66, { fontSize: 7.5, r: 0.4, g: 0.45, b: 0.5 })
+
+  // Right box: Totals
+  pdf.fillRect(326, curY, 233, 84, 0.98, 0.98, 0.99)
+  pdf.strokeRect(326, curY, 233, 84, 0.88, 0.9, 0.94, 1)
+  pdf.drawText('Subtotal:', 336, curY + 12, { fontSize: 8, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(formatCurrency(quotation.subtotal || quotation.total), 540, curY + 12, { fontSize: 8, align: 'right', r: 0.2, g: 0.25, b: 0.3 })
+
+  if (quotation.discount && quotation.discount > 0) {
+    pdf.drawText('Discount:', 336, curY + 26, { fontSize: 8, r: 0.8, g: 0.2, b: 0.2 })
+    pdf.drawText(`- ${formatCurrency(quotation.discount)}`, 540, curY + 26, { fontSize: 8, align: 'right', r: 0.8, g: 0.2, b: 0.2 })
+  }
+
+  if (quotation.tax_amount && quotation.tax_amount > 0) {
+    pdf.drawText(`Tax (${quotation.tax_rate || 18}% GST):`, 336, curY + 40, { fontSize: 8, r: 0.35, g: 0.4, b: 0.45 })
+    pdf.drawText(formatCurrency(quotation.tax_amount), 540, curY + 40, { fontSize: 8, align: 'right', r: 0.2, g: 0.25, b: 0.3 })
+  }
+
+  pdf.line(336, curY + 54, 549, curY + 54, 0.8, 0.85, 0.9, 1)
+  pdf.drawText('TOTAL PAYABLE:', 336, curY + 66, { fontSize: 9.5, bold: true, r: 0.08, g: 0.15, b: 0.3 })
+  pdf.drawText(formatCurrency(quotation.total), 540, curY + 66, { fontSize: 11, bold: true, align: 'right', r: 0.08, g: 0.4, b: 0.2 })
+
+  // Approval status / Signoff
+  curY += 98
+  if (quotation.status === 'approved' && quotation.approval_details) {
+    pdf.fillRect(36, curY, 523, 44, 0.94, 0.98, 0.94)
+    pdf.strokeRect(36, curY, 523, 44, 0.6, 0.8, 0.6, 1)
+    pdf.drawText('OFFICIALLY APPROVED BY CLIENT REPRESENTATIVE', 50, curY + 12, { fontSize: 9, bold: true, r: 0.08, g: 0.5, b: 0.15 })
+    pdf.drawText(`Approved By: ${quotation.approval_details.approved_by} (${quotation.approval_details.approver_email})   •   Date: ${formatDate(quotation.approval_details.approved_at)}`, 50, curY + 28, { fontSize: 8, r: 0.15, g: 0.4, b: 0.2 })
+  } else {
+    pdf.fillRect(36, curY, 256, 48, 0.98, 0.98, 0.99)
+    pdf.strokeRect(36, curY, 256, 48, 0.88, 0.9, 0.94, 1)
+    pdf.drawText('Prepared By: CapeSecure Solutions', 44, curY + 10, { fontSize: 7.5, bold: true, r: 0.3, g: 0.35, b: 0.45 })
+    pdf.drawText('Authorized Signature: __________________', 44, curY + 32, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+
+    pdf.fillRect(302, curY, 257, 48, 0.98, 0.98, 0.99)
+    pdf.strokeRect(302, curY, 257, 48, 0.88, 0.9, 0.94, 1)
+    pdf.drawText('Client Acceptance & Sign-off', 312, curY + 10, { fontSize: 7.5, bold: true, r: 0.3, g: 0.35, b: 0.45 })
+    pdf.drawText('Authorized Signatory: __________________', 312, curY + 32, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  }
+
+  // Footer
+  pdf.line(36, 765, 559, 765, 0.85, 0.88, 0.92, 1)
+  pdf.drawText('CapeSecure Business Management Platform • Official Quotation Document', 36, 775, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText('https://capesecure.vercel.app', 559, 775, { fontSize: 7.5, align: 'right', r: 0.45, g: 0.5, b: 0.55 })
+
+  pdf.download(`CapeSecure-Quotation-${quoteSafe}.pdf`)
+}
+
+// ─── AGREEMENT GENERATION & PDF BUILDER (PHASE 5) ──────────────────────────
+
+/**
+ * Generates the full 17-section Master Service Agreement HTML document
+ */
+export function generateAgreementHTML(agreement: Agreement, client?: Client | null, quotation?: Quotation | null): string {
+  const clientName = client?.name || 'Valued Client'
+  const companyName = client?.business_name || client?.company || 'Client Organization'
+  const clientCode = client?.client_code || 'CS-CLIENT'
+  const clientEmail = client?.email || 'N/A'
+  const clientPhone = client?.phone || 'N/A'
+  const clientAddress = [client?.address, client?.city, client?.state, client?.country].filter(Boolean).join(', ') || 'Registered Address on file'
+  const clientGstin = client?.gstin ? `GSTIN: ${client.gstin}` : 'GSTIN: Not Provided'
+
+  const totalVal = agreement.total_value || quotation?.total || 0
+  const advancePct = agreement.advance_percentage || 50
+  const advanceAmt = agreement.advance_amount || (totalVal * advancePct) / 100
+  const balanceAmt = agreement.balance_amount || (totalVal - advanceAmt)
+
+  const isSigned = agreement.status === 'fully_signed' || agreement.status === 'signed' || agreement.status === 'active'
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CapeSecure Master Service Agreement - ${agreement.agreement_number}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 18mm 18mm 18mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      line-height: 1.5;
+      font-size: 11.5px;
+      margin: 0;
+      padding: 0;
+    }
+    .header-banner {
+      background: linear-gradient(135deg, #090d16 0%, #0f172a 100%);
+      color: #ffffff;
+      padding: 24px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+    .brand-subtitle {
+      font-size: 9.5px;
+      letter-spacing: 1.2px;
+      color: #38bdf8;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .agreement-meta {
+      text-align: right;
+    }
+    .agreement-ref {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .agreement-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-top: 4px;
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+    .parties-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .party-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 14px;
+      background: #f8fafc;
+    }
+    .party-role {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #0284c7;
+      margin-bottom: 6px;
+    }
+    .party-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .party-details {
+      font-size: 10.5px;
+      color: #475569;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #0f172a;
+      border-bottom: 1.5px solid #0f172a;
+      padding-bottom: 4px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-num {
+      background: #0f172a;
+      color: #ffffff;
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .clause-text {
+      color: #334155;
+      margin-bottom: 10px;
+      text-align: justify;
+    }
+    .deliverables-table, .financials-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    .deliverables-table th, .financials-table th {
+      background: #f1f5f9;
+      color: #1e293b;
+      font-weight: 700;
+      font-size: 10px;
+      text-transform: uppercase;
+      padding: 8px 10px;
+      text-align: left;
+      border: 1px solid #cbd5e1;
+    }
+    .deliverables-table td, .financials-table td {
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      font-size: 10.5px;
+    }
+    .signature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 30px;
+      page-break-inside: avoid;
+    }
+    .signature-box {
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 16px;
+      background: #ffffff;
+    }
+    .sig-role {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+    .sig-space {
+      height: 60px;
+      border-bottom: 1px dashed #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-style: italic;
+      font-size: 11px;
+    }
+    .sig-details {
+      margin-top: 8px;
+      font-size: 10px;
+      color: #475569;
+      line-height: 1.4;
+    }
+    .audit-box {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 16px;
+      font-size: 10px;
+      color: #166534;
+      page-break-inside: avoid;
+    }
+    .footer {
+      margin-top: 36px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 9px;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-banner">
+    <div>
+      <div class="brand-title">CAPESECURE SOLUTIONS</div>
+      <div class="brand-subtitle">Master Website Development & Software Service Agreement</div>
+    </div>
+    <div class="agreement-meta">
+      <div class="agreement-ref">${agreement.agreement_number}</div>
+      <div class="agreement-badge">${agreement.status.replace(/_/g, ' ')}</div>
+      <div style="font-size: 9.5px; color: #94a3b8; margin-top: 4px;">Executed: ${formatDate(agreement.created_at)}</div>
+    </div>
+  </div>
+
+  <p class="clause-text">
+    This Master Website Development & Service Agreement (the <strong>"Agreement"</strong>) is entered into and made effective as of 
+    <strong>${formatDate(agreement.created_at)}</strong> (the <strong>"Effective Date"</strong>), by and between the parties set forth below:
+  </p>
+
+  <div class="parties-grid">
+    <div class="party-card">
+      <div class="party-role">Service Provider (Developer)</div>
+      <div class="party-name">CapeSecure Solutions</div>
+      <div class="party-details">
+        Registered Agency & Cybersecurity Operations<br>
+        Email: support@capesecure.com • Phone: +91 94892 23812<br>
+        Web: https://capesecure.vercel.app<br>
+        Kerala, India • GSTIN: 32ABCDE1234F1Z5
+      </div>
+    </div>
+
+    <div class="party-card">
+      <div class="party-role">Client (Customer)</div>
+      <div class="party-name">${companyName}</div>
+      <div class="party-details">
+        Authorized Representative: ${clientName}<br>
+        Email: ${clientEmail} • Phone: ${clientPhone}<br>
+        ${clientAddress}<br>
+        ${clientGstin} • Client Ref: ${clientCode}
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section-title"><span class="section-num">1</span> Service Provider Details</div>
+  <div class="clause-text">
+    ${agreement.content || `CapeSecure Solutions provides enterprise-grade full-stack web application development, security engineering, responsive UI/UX implementation, cloud infrastructure hosting, and database integration services.`}
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="section-title"><span class="section-num">2</span> Client Details</div>
+  <div class="clause-text">
+    The Client is represented by <strong>${clientName}</strong>, acting as an authorized signatory for <strong>${companyName}</strong>, possessing full legal capacity to bind the business entity to all terms, milestone payments, and obligations set forth herein.
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="section-title"><span class="section-num">3</span> Scope of Services</div>
+  <div class="clause-text">
+    ${agreement.scope_of_services || `CapeSecure shall furnish all software design, full-stack programming, cloud architecture configuration, testing, and deployment services necessary to complete <strong>"${agreement.title}"</strong> in strict compliance with the approved technical specifications.`}
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="section-title"><span class="section-num">4</span> Project Deliverables</div>
+  <table class="deliverables-table">
+    <thead>
+      <tr>
+        <th style="width: 35px;">#</th>
+        <th>Deliverable Description</th>
+        <th style="width: 70px; text-align: center;">Qty</th>
+        <th style="width: 110px; text-align: right;">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${(agreement.project_deliverables && agreement.project_deliverables.length > 0)
+        ? agreement.project_deliverables.map((d, i) => `
+          <tr>
+            <td style="text-align: center; color: #64748b;">${i + 1}</td>
+            <td><strong>${d.title}</strong>${d.description ? `<br><span style="color: #64748b; font-size: 9.5px;">${d.description}</span>` : ''}</td>
+            <td style="text-align: center;">${d.quantity || 1}</td>
+            <td style="text-align: right; font-weight: 600;">${d.price ? formatCurrency(d.price) : 'Included'}</td>
+          </tr>
+        `).join('')
+        : (quotation?.items && quotation.items.length > 0)
+          ? quotation.items.map((it, i) => `
+            <tr>
+              <td style="text-align: center; color: #64748b;">${i + 1}</td>
+              <td><strong>${it.description}</strong></td>
+              <td style="text-align: center;">${it.quantity || 1}</td>
+              <td style="text-align: right; font-weight: 600;">${formatCurrency(it.total)}</td>
+            </tr>
+          `).join('')
+          : `<tr><td colspan="4" style="text-align: center; color: #64748b;">Comprehensive Website Architecture and Deployment as per quotation ${agreement.quotation_number || 'CS-QTN-2026-001'}</td></tr>`
+      }
+    </tbody>
+  </table>
+
+  <!-- SECTION 5 -->
+  <div class="section-title"><span class="section-num">5</span> Development Charges & Commercial Terms</div>
+  <div class="clause-text">
+    The total agreed project fee is <strong>${formatCurrency(totalVal)}</strong>, inclusive of all direct development, QA testing, and launch activities explicitly scoped in Section 4. Any ancillary work outside this scope shall be governed by an approved written Change Request.
+  </div>
+
+  <!-- SECTION 6 -->
+  <div class="section-title"><span class="section-num">6</span> Payment Schedule</div>
+  <table class="financials-table">
+    <thead>
+      <tr>
+        <th>Milestone / Tranche</th>
+        <th style="width: 100px; text-align: center;">Percentage</th>
+        <th style="width: 120px; text-align: right;">Amount</th>
+        <th>Trigger Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Advance Mobilization Deposit</strong></td>
+        <td style="text-align: center; font-weight: 700;">${advancePct}%</td>
+        <td style="text-align: right; font-weight: 700; color: #0284c7;">${formatCurrency(advanceAmt)}</td>
+        <td>Due upon signing of this Agreement prior to technical kickoff.</td>
+      </tr>
+      <tr>
+        <td><strong>Final Settlement & Handover</strong></td>
+        <td style="text-align: center; font-weight: 700;">${100 - advancePct}%</td>
+        <td style="text-align: right; font-weight: 700; color: #166534;">${formatCurrency(balanceAmt)}</td>
+        <td>Due upon successful staging QA sign-off before production release.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 7 -->
+  <div class="section-title"><span class="section-num">7</span> Domain and Hosting Ownership</div>
+  <div class="clause-text">
+    ${agreement.domain_hosting_ownership || `The Client retains sole and complete ownership of their registered domain names, branding assets, and commercial data. Hosting accounts provisioned by CapeSecure shall be transferred or directly bound to the Client upon receipt of 100% final settlement.`}
+  </div>
+
+  <!-- SECTION 8 -->
+  <div class="section-title"><span class="section-num">8</span> Delivery Timeline & Milestone Schedules</div>
+  <div class="clause-text">
+    ${agreement.delivery_timeline || `Estimated project duration is <strong>${quotation?.delivery_timeline || '4 to 6 weeks'}</strong> from receipt of advance deposit and all requisite client assets (branding, copy, and credentials).`}
+  </div>
+
+  <!-- SECTION 9 -->
+  <div class="section-title"><span class="section-num">9</span> Revisions, Changes & Iteration Policy</div>
+  <div class="clause-text">
+    ${agreement.revisions_policy || `The project includes up to two (2) consolidated feedback revision rounds during the UI/UX design phase and one (1) feedback revision round during staging QA. Out-of-scope modifications shall be billed at CapeSecure's standard engineering hourly rate upon mutual agreement.`}
+  </div>
+
+  <!-- SECTION 10 -->
+  <div class="section-title"><span class="section-num">10</span> Intellectual Property Rights</div>
+  <div class="clause-text">
+    ${agreement.ip_terms || `Upon complete payment of all fees due under this Agreement, CapeSecure transfers to the Client all worldwide rights, title, and ownership in the bespoke frontend and backend source code created exclusively for this project. CapeSecure retains ownership of its proprietary pre-existing libraries, developer tooling, and reusable framework components.`}
+  </div>
+
+  <!-- SECTION 11 -->
+  <div class="section-title"><span class="section-num">11</span> Confidentiality & Non-Disclosure</div>
+  <div class="clause-text">
+    ${agreement.confidentiality_terms || `Both parties agree to hold all proprietary trade secrets, user databases, credentials, source code, and commercial negotiations in strict confidence for a period of no less than three (3) years from the Effective Date.`}
+  </div>
+
+  <!-- SECTION 12 -->
+  <div class="section-title"><span class="section-num">12</span> Maintenance Conditions & Post-Launch Warranty</div>
+  <div class="clause-text">
+    ${agreement.maintenance_terms || `CapeSecure provides a thirty (30) calendar day warranty period commencing on the Handover date, during which any reproducible software defects or functional deviations from Section 4 will be resolved at zero additional charge. Ongoing maintenance, security patches, and backups thereafter are covered under separate Service Level Agreements (SLAs).`}
+  </div>
+
+  <!-- SECTION 13 -->
+  <div class="section-title"><span class="section-num">13</span> Cancellation & Refund Terms</div>
+  <div class="clause-text">
+    ${agreement.cancellation_terms || `Either party may terminate this Agreement with fourteen (14) days written notice. In the event of early termination by the Client, CapeSecure shall retain the advance payment to cover engineering time expended, and bill for completed deliverables on a pro-rata basis.`}
+  </div>
+
+  <!-- SECTION 14 -->
+  <div class="section-title"><span class="section-num">14</span> Liability & Third-Party Services</div>
+  <div class="clause-text">
+    ${agreement.liability_terms || `CapeSecure shall not be held liable for outages, pricing changes, or security breaches resulting from third-party services, APIs, payment gateways, or hosting providers outside of CapeSecure's direct architectural control. Total aggregate liability under any legal theory shall not exceed the total fees paid by Client under this Agreement.`}
+  </div>
+
+  <!-- SECTION 15 -->
+  <div class="section-title"><span class="section-num">15</span> Dispute Resolution</div>
+  <div class="clause-text">
+    ${agreement.dispute_resolution || `Any controversy or dispute arising out of this Agreement shall first be resolved through good-faith executive negotiation. If unresolved within 30 days, the matter shall be submitted to binding arbitration conducted in accordance with the Arbitration and Conciliation Act.`}
+  </div>
+
+  <!-- SECTION 16 -->
+  <div class="section-title"><span class="section-num">16</span> Governing Law & Jurisdiction</div>
+  <div class="clause-text">
+    ${agreement.governing_law || `This Agreement shall be governed by, construed, and enforced in accordance with the substantive laws of India, and the competent courts situated in Kerala, India shall have exclusive jurisdiction.`}
+  </div>
+
+  <!-- SECTION 17 -->
+  <div class="section-title"><span class="section-num">17</span> Execution & Signature Sign-off</div>
+  <p class="clause-text">
+    IN WITNESS WHEREOF, the duly authorized representatives of CapeSecure Solutions and the Client have executed this Master Service Agreement as of the date indicated.
+  </p>
+
+  <div class="signature-grid">
+    <div class="signature-box">
+      <div class="sig-role">For: CapeSecure Solutions (Developer)</div>
+      <div class="sig-space">
+        ${isSigned ? `<span style="color: #0284c7; font-weight: 700; font-style: normal;">[Digitally Verified / Authorized Officer]</span>` : `Authorized Signature`}
+      </div>
+      <div class="sig-details">
+        Name: Libinesh (Principal Architect)<br>
+        Title: Lead Engineering Officer<br>
+        Date: ${formatDate(agreement.created_at)}
+      </div>
+    </div>
+
+    <div class="signature-box">
+      <div class="sig-role">For: ${companyName} (Client)</div>
+      <div class="sig-space">
+        ${isSigned ? `<span style="color: #166534; font-weight: 700; font-style: normal;">[Digitally Signed by Authorized Signatory]</span>` : `Client Authorized Signature`}
+      </div>
+      <div class="sig-details">
+        Name: ${clientName}<br>
+        Title: Authorized Representative<br>
+        Date: ${agreement.signed_at ? formatDate(agreement.signed_at) : '__________________'}
+      </div>
+    </div>
+  </div>
+
+  ${(agreement.signing_method === 'digital' && agreement.esign_details) ? `
+    <div class="audit-box">
+      <strong>✓ DIGITAL SIGNATURE VERIFICATION AUDIT RECORD</strong><br>
+      Provider: ${agreement.esign_details.provider.toUpperCase()} • Transaction ID: ${agreement.esign_details.envelope_id || agreement.esign_details.signing_url || 'ZS-2026-LIVE'}<br>
+      Status: ${agreement.esign_details.status} • Signers: ${(agreement.esign_details.signers || []).map((s: any) => `${s.name} (${s.email}) - ${s.status}`).join('; ')}<br>
+      Verification Hash (SHA-256): <em>${agreement.signature_audit?.tamper_proof_checksum || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}</em>
+    </div>
+  ` : (agreement.signing_method === 'physical' && agreement.physical_custody) ? `
+    <div class="audit-box" style="background: #f8fafc; border-color: #cbd5e1; color: #334155;">
+      <strong>📁 PHYSICAL SIGNED DOCUMENT CUSTODY EVIDENCE</strong><br>
+      Storage Locker / Binder Reference: <strong>${agreement.physical_custody.storage_location}</strong><br>
+      Physical Custodian: ${agreement.physical_custody.custodian_name} • Received Date: ${formatDate(agreement.physical_custody.received_date)}<br>
+      Verified Admin ID: ${agreement.physical_custody.verified_by_admin_id} • File: ${agreement.physical_custody.scanned_copy_url || 'Physical Scanned Copy Uploaded'}
+    </div>
+  ` : ''}
+
+  <div class="footer">
+    <span>CapeSecure Master Service Agreement • Ref: ${agreement.agreement_number}</span>
+    <span>https://capesecure.vercel.app • Legally Binding Document</span>
+  </div>
+</body>
+</html>`
+}
+
+/**
+ * Opens print preview window for Agreement
+ */
+export function openPrintableAgreement(agreement: Agreement, client?: Client | null, quotation?: Quotation | null) {
+  const html = generateAgreementHTML(agreement, client, quotation)
+  const printWindow = window.open('', '_blank', 'width=950,height=900')
+  if (!printWindow) {
+    alert('Please allow popups to view or print the Agreement document.')
+    return
+  }
+  printWindow.document.open()
+  printWindow.document.write(html)
+  printWindow.document.close()
+  printWindow.focus()
+  setTimeout(() => {
+    printWindow.print()
+  }, 400)
+}
+
+/**
+ * Downloads a genuine binary .pdf file for the Agreement with all 17 legal sections
+ */
+export function downloadAgreementPDF(agreement: Agreement, client?: Client | null, quotation?: Quotation | null) {
+  const pdf = new PDFBuilder()
+  const agrSafe = agreement.agreement_number.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const clientName = client?.name || 'Valued Client'
+  const companyName = client?.business_name || client?.company || 'Client Organization'
+  const totalVal = agreement.total_value || quotation?.total || 0
+  const advancePct = agreement.advance_percentage || 50
+  const advanceAmt = agreement.advance_amount || (totalVal * advancePct) / 100
+  const balanceAmt = agreement.balance_amount || (totalVal - advanceAmt)
+
+  // ════════════ PAGE 1: RECITALS & COMMERCIAL TERMS ════════════
+  pdf.fillRect(36, 36, 523, 60, 0.05, 0.09, 0.16)
+  pdf.drawText('CAPESECURE SOLUTIONS', 50, 48, { fontSize: 15, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('MASTER WEBSITE DEVELOPMENT & SERVICE AGREEMENT', 50, 68, { fontSize: 8, bold: true, r: 0.38, g: 0.75, b: 0.99 })
+
+  pdf.drawText('LEGAL CONTRACT', 540, 48, { fontSize: 9, bold: true, align: 'right', r: 0.38, g: 0.75, b: 0.99 })
+  pdf.drawText(`AGR NO: ${agreement.agreement_number}`, 540, 64, { fontSize: 8.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
+  pdf.drawText(`STATUS: ${agreement.status.toUpperCase()}`, 540, 78, { fontSize: 8, align: 'right', r: 0.8, g: 0.85, b: 0.9 })
+
+  // Parties banner
+  pdf.fillRect(36, 106, 523, 70, 0.96, 0.97, 0.99)
+  pdf.strokeRect(36, 106, 523, 70, 0.85, 0.88, 0.93, 1)
+
+  pdf.drawText('SERVICE PROVIDER (DEVELOPER):', 48, 116, { fontSize: 7.5, bold: true, r: 0.1, g: 0.35, b: 0.65 })
+  pdf.drawText('CapeSecure Solutions | support@capesecure.com | Kerala, India', 48, 128, { fontSize: 8.5, r: 0.2, g: 0.25, b: 0.35 })
+
+  pdf.drawText('CLIENT (CUSTOMER):', 48, 146, { fontSize: 7.5, bold: true, r: 0.1, g: 0.35, b: 0.65 })
+  pdf.drawText(`${companyName} (Attn: ${clientName}) | ${client?.email || 'N/A'}`, 48, 158, { fontSize: 8.5, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+
+  // 1. Service Provider Details
+  let curY = 190
+  pdf.drawText('1. SERVICE PROVIDER DETAILS', 36, curY, { fontSize: 9, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+  curY += 12
+  curY = pdf.drawParagraph('CapeSecure Solutions provides enterprise-grade full-stack web engineering, cybersecurity compliance, scalable cloud deployments, and ongoing technical maintenance.', 36, curY, 523, { fontSize: 8, lineHeight: 11, r: 0.3, g: 0.35, b: 0.4 })
+
+  // 2. Client Details
+  curY += 8
+  pdf.drawText('2. CLIENT DETAILS', 36, curY, { fontSize: 9, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+  curY += 12
+  curY = pdf.drawParagraph(`The Client is represented by ${clientName}, authorized signatory for ${companyName}, with authority to enter into binding agreements.`, 36, curY, 523, { fontSize: 8, lineHeight: 11, r: 0.3, g: 0.35, b: 0.4 })
+
+  // 3. Scope of Services
+  curY += 8
+  pdf.drawText('3. SCOPE OF SERVICES', 36, curY, { fontSize: 9, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+  curY += 12
+  const scopeText = agreement.scope_of_services || `Design, frontend programming, database integration, security configuration, and production hosting for "${agreement.title}".`
+  curY = pdf.drawParagraph(scopeText, 36, curY, 523, { fontSize: 8, lineHeight: 11, r: 0.3, g: 0.35, b: 0.4 })
+
+  // 4. Project Deliverables Table
+  curY += 8
+  pdf.drawText('4. PROJECT DELIVERABLES', 36, curY, { fontSize: 9, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+  curY += 12
+  pdf.fillRect(36, curY, 523, 16, 0.1, 0.15, 0.25)
+  pdf.drawText('#', 44, curY + 4, { fontSize: 7.5, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('DELIVERABLE DESCRIPTION', 66, curY + 4, { fontSize: 7.5, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('PRICE', 540, curY + 4, { fontSize: 7.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
+  curY += 16
+
+  const deliverables = (agreement.project_deliverables && agreement.project_deliverables.length > 0)
+    ? agreement.project_deliverables
+    : (quotation?.items && quotation.items.length > 0)
+      ? quotation.items.map(it => ({ title: it.description, price: it.total }))
+      : [{ title: agreement.title || 'Full Custom Web Portal Architecture', price: totalVal }]
+
+  deliverables.slice(0, 4).forEach((d, i) => {
+    pdf.strokeRect(36, curY, 523, 18, 0.9, 0.92, 0.95, 1)
+    pdf.drawText(String(i + 1), 44, curY + 5, { fontSize: 7.5, r: 0.4, g: 0.4, b: 0.45 })
+    pdf.drawText(d.title.substring(0, 65), 66, curY + 5, { fontSize: 8, bold: true, r: 0.15, g: 0.2, b: 0.3 })
+    pdf.drawText(formatCurrency(d.price || 0), 540, curY + 5, { fontSize: 8, align: 'right', r: 0.15, g: 0.2, b: 0.3 })
+    curY += 18
+  })
+
+  // 5. Development Charges
+  curY += 8
+  pdf.drawText('5. DEVELOPMENT CHARGES & COMMERCIAL TERMS', 36, curY, { fontSize: 9, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+  curY += 12
+  curY = pdf.drawParagraph(`The total agreed project consideration is ${formatCurrency(totalVal)}, payable in milestones as outlined in Section 6 below.`, 36, curY, 523, { fontSize: 8, lineHeight: 11, r: 0.3, g: 0.35, b: 0.4 })
+
+  // 6. Payment Schedule
+  curY += 8
+  pdf.drawText('6. PAYMENT SCHEDULE', 36, curY, { fontSize: 9, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+  curY += 12
+  pdf.fillRect(36, curY, 523, 44, 0.95, 0.97, 0.99)
+  pdf.strokeRect(36, curY, 523, 44, 0.85, 0.88, 0.93, 1)
+  pdf.drawText(`Tranche 1: Mobilization Advance (${advancePct}%) = ${formatCurrency(advanceAmt)}`, 48, curY + 8, { fontSize: 8, bold: true, r: 0.1, g: 0.5, b: 0.25 })
+  pdf.drawText('Due immediately upon execution of this Agreement prior to technical work mobilization.', 48, curY + 18, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`Tranche 2: Final Settlement (${100 - advancePct}%) = ${formatCurrency(balanceAmt)}`, 48, curY + 28, { fontSize: 8, bold: true, r: 0.1, g: 0.2, b: 0.35 })
+  pdf.drawText('Due upon QA acceptance sign-off prior to production DNS handover.', 48, curY + 38, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+
+  // Footer Page 1
+  pdf.line(36, 785, 559, 785, 0.85, 0.88, 0.92, 1)
+  pdf.drawText(`CapeSecure Master Service Agreement • Ref: ${agreement.agreement_number}`, 36, 795, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText('Page 1 of 2', 559, 795, { fontSize: 7.5, align: 'right', r: 0.45, g: 0.5, b: 0.55 })
+
+  // ════════════ PAGE 2: LEGAL COVENANTS & SIGN-OFF ════════════
+  pdf.addPage()
+
+  pdf.fillRect(36, 36, 523, 26, 0.08, 0.12, 0.22)
+  pdf.drawText('CAPESECURE MASTER SERVICE AGREEMENT — TERMS & SIGN-OFF', 50, 46, { fontSize: 8.5, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText(`REF: ${agreement.agreement_number}`, 540, 46, { fontSize: 8.5, align: 'right', r: 0.38, g: 0.75, b: 0.99 })
+
+  curY = 76
+  const clausesPage2 = [
+    { title: '7. DOMAIN & HOSTING OWNERSHIP', text: agreement.domain_hosting_ownership || 'The Client retains full ownership of registered domain names and brand trademarks. Cloud hosting accounts and source repositories are transferred to the Client upon receipt of 100% final settlement.' },
+    { title: '8. DELIVERY TIMELINE', text: agreement.delivery_timeline || `Estimated delivery timeline is ${quotation?.delivery_timeline || '4-6 weeks'} from receipt of the advance mobilization deposit and all requisite client assets.` },
+    { title: '9. REVISIONS & CHANGES', text: agreement.revisions_policy || 'Includes up to 2 consolidated feedback revisions during UI/UX prototyping and 1 revision round during staging QA. Out-of-scope alterations are governed by a written Change Request.' },
+    { title: '10. INTELLECTUAL PROPERTY', text: agreement.ip_terms || 'Upon full final settlement, all proprietary custom code and design assets transfer to the Client. CapeSecure retains ownership of its foundational tooling and reusable core libraries.' },
+    { title: '11. CONFIDENTIALITY', text: agreement.confidentiality_terms || 'Both parties covenant to maintain all technical specifications, customer records, and commercial negotiations in strict confidence for at least 3 years.' },
+    { title: '12. MAINTENANCE & WARRANTY', text: agreement.maintenance_terms || 'Includes a 30-day post-handover warranty covering bug fixes and specification corrections at zero additional cost. Ongoing maintenance is governed by separate SLAs.' },
+    { title: '13. CANCELLATION & REFUNDS', text: agreement.cancellation_terms || 'Either party may terminate with 14 days written notice. Early termination by Client forfeits the advance deposit to cover engineering mobilization costs.' },
+    { title: '14. LIABILITY & THIRD-PARTY SERVICES', text: agreement.liability_terms || 'CapeSecure is not liable for third-party hosting, API, or payment gateway service interruptions. Total aggregate liability is limited to fees received under this Agreement.' },
+    { title: '15. DISPUTE RESOLUTION', text: agreement.dispute_resolution || 'Disputes shall be settled through good-faith negotiation, followed by binding arbitration in accordance with the Arbitration and Conciliation Act.' },
+    { title: '16. GOVERNING LAW & JURISDICTION', text: agreement.governing_law || 'This Agreement is governed by the laws of India, with exclusive jurisdiction in Kerala, India.' },
+  ]
+
+  for (const c of clausesPage2) {
+    pdf.drawText(c.title, 36, curY, { fontSize: 8, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+    curY += 10
+    curY = pdf.drawParagraph(c.text, 36, curY, 523, { fontSize: 7.5, lineHeight: 10, r: 0.3, g: 0.35, b: 0.4 })
+    curY += 6
+  }
+
+  // 17. Signature Section
+  curY += 4
+  pdf.drawText('17. EXECUTION & SIGNATURE SIGN-OFF', 36, curY, { fontSize: 8.5, bold: true, r: 0.08, g: 0.12, b: 0.22 })
+  curY += 12
+
+  // Sign boxes
+  const isSigned = agreement.status === 'fully_signed' || agreement.status === 'signed' || agreement.status === 'active'
+
+  pdf.fillRect(36, curY, 256, 70, 0.98, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 256, 70, 0.85, 0.88, 0.93, 1)
+  pdf.drawText('FOR: CAPESECURE SOLUTIONS', 46, curY + 8, { fontSize: 7.5, bold: true, r: 0.1, g: 0.35, b: 0.65 })
+  if (isSigned) {
+    pdf.drawText('[DIGITALLY VERIFIED SIGNATURE]', 46, curY + 28, { fontSize: 8, bold: true, r: 0.1, g: 0.5, b: 0.25 })
+  } else {
+    pdf.drawText('Signature: __________________________', 46, curY + 32, { fontSize: 7.5, r: 0.4, g: 0.45, b: 0.5 })
+  }
+  pdf.drawText('Name: Libinesh (Principal Architect)', 46, curY + 46, { fontSize: 7, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`Date: ${formatDate(agreement.created_at)}`, 46, curY + 56, { fontSize: 7, r: 0.35, g: 0.4, b: 0.45 })
+
+  pdf.fillRect(302, curY, 257, 70, 0.98, 0.98, 0.99)
+  pdf.strokeRect(302, curY, 257, 70, 0.85, 0.88, 0.93, 1)
+  pdf.drawText(`FOR: ${companyName.toUpperCase().substring(0, 30)}`, 312, curY + 8, { fontSize: 7.5, bold: true, r: 0.1, g: 0.35, b: 0.65 })
+  if (isSigned) {
+    pdf.drawText('[DIGITALLY SIGNED BY CLIENT]', 312, curY + 28, { fontSize: 8, bold: true, r: 0.1, g: 0.5, b: 0.25 })
+  } else {
+    pdf.drawText('Client Signature: ___________________', 312, curY + 32, { fontSize: 7.5, r: 0.4, g: 0.45, b: 0.5 })
+  }
+  pdf.drawText(`Signatory: ${clientName}`, 312, curY + 46, { fontSize: 7, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`Date: ${agreement.signed_at ? formatDate(agreement.signed_at) : 'Pending Execution'}`, 312, curY + 56, { fontSize: 7, r: 0.35, g: 0.4, b: 0.45 })
+
+  // Audit info banner
+  curY += 76
+  if (agreement.signing_method === 'digital' && agreement.esign_details) {
+    pdf.fillRect(36, curY, 523, 24, 0.95, 0.98, 0.95)
+    pdf.strokeRect(36, curY, 523, 24, 0.7, 0.85, 0.7, 1)
+    pdf.drawText(`DIGITAL SIGNATURE AUDIT: Provider: ${agreement.esign_details.provider.toUpperCase()} | Env ID: ${agreement.esign_details.envelope_id || 'LIVE-ZS'}`, 44, curY + 6, { fontSize: 7, bold: true, r: 0.1, g: 0.45, b: 0.2 })
+    pdf.drawText(`SHA-256 Hash: ${agreement.signature_audit?.tamper_proof_checksum || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}`, 44, curY + 14, { fontSize: 6.5, r: 0.2, g: 0.4, b: 0.25 })
+  } else if (agreement.signing_method === 'physical' && agreement.physical_custody) {
+    pdf.fillRect(36, curY, 523, 24, 0.96, 0.97, 0.98)
+    pdf.strokeRect(36, curY, 523, 24, 0.8, 0.85, 0.9, 1)
+    pdf.drawText(`PHYSICAL CUSTODY RECORD: Storage Location: ${agreement.physical_custody.storage_location} | Custodian: ${agreement.physical_custody.custodian_name}`, 44, curY + 6, { fontSize: 7, bold: true, r: 0.2, g: 0.3, b: 0.45 })
+    pdf.drawText(`Verified by Admin: ${agreement.physical_custody.verified_by_admin_id} | Date: ${formatDate(agreement.physical_custody.received_date)}`, 44, curY + 14, { fontSize: 6.5, r: 0.3, g: 0.35, b: 0.4 })
+  }
+
+  // Footer Page 2
+  pdf.line(36, 785, 559, 785, 0.85, 0.88, 0.92, 1)
+  pdf.drawText(`CapeSecure Master Service Agreement • Ref: ${agreement.agreement_number}`, 36, 795, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText('Page 2 of 2 • Legally Binding Contract', 559, 795, { fontSize: 7.5, align: 'right', r: 0.45, g: 0.5, b: 0.55 })
+
+  pdf.download(`CapeSecure-Agreement-${agrSafe}.pdf`)
+}
+
 

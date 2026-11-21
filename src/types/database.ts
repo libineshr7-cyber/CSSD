@@ -294,25 +294,69 @@ export interface Quotation {
   updated_at: string
 }
 
-export type AgreementStatus = 'draft' | 'sent' | 'signed' | 'active' | 'completed' | 'terminated'
+export type AgreementStatus =
+  | 'draft'
+  | 'sent_for_signature'
+  | 'partially_signed'
+  | 'fully_signed'
+  | 'declined'
+  | 'expired'
+  | 'sent'
+  | 'signed'
+  | 'active'
+  | 'completed'
+  | 'terminated'
+
+export interface AgreementDeliverable {
+  title: string
+  description?: string
+  quantity?: number
+  price?: number
+}
+
+export interface AgreementPaymentScheduleItem {
+  milestone: string
+  percentage: number
+  amount: number
+  dueTrigger: string
+}
 
 export interface Agreement {
   id: string
   client_id: string
   quotation_id: string | null
+  quotation_number?: string | null
   agreement_number: string
   title: string
-  content: string
+  content?: string | null
+  scope_of_services?: string | null
+  project_deliverables?: AgreementDeliverable[]
   total_value: number
   advance_percentage: number
   advance_amount: number
   balance_amount: number
+  payment_schedule?: AgreementPaymentScheduleItem[]
+  delivery_timeline?: string | null
+  domain_hosting_ownership?: string | null
+  revisions_policy?: string | null
+  ip_terms?: string | null
+  confidentiality_terms?: string | null
+  maintenance_terms?: string | null
+  cancellation_terms?: string | null
+  liability_terms?: string | null
+  dispute_resolution?: string | null
+  governing_law?: string | null
   status: AgreementStatus
+  signing_method?: 'digital' | 'physical'
+  esign_details?: any
+  signature_audit?: any
+  physical_custody?: any
   signed_at: string | null
   signature_url: string | null
   file_url: string | null
   start_date: string | null
   end_date: string | null
+  is_privately_restricted?: boolean
   created_at: string
   updated_at: string
 }
