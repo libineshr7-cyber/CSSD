@@ -1,598 +1,1510 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   FileText, Plus, Eye, Edit2, Download, Trash2, X, Search,
-  CheckCircle, Clock, Send, XCircle, TrendingUp
+  CheckCircle, Clock, Send, XCircle, Copy, Printer,
+  RefreshCw, Check, ArrowRight, ShieldCheck, Mail, Link as LinkIcon
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { demoQuotations, demoClients } from '../data/demoData'
-import type { Quotation } from '../types/database'
+import { supabase } from '../lib/supabase'
+import { openPrintableQuotation, downloadQuotationHTML } from '../lib/pdfGenerator'
+import type { Quotation, QuotationItem, QuotationStatus, Client, PaymentMilestone } from '../types/database'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Status Configuration ─────────────────────────────────────────────────────
 
-interface QuoteItem {
-  description: string
-  quantity: number
-  unit_price: number
-  total: number
+export const QUOTE_STATUS_CONFIG: Record<string, { label: string; badge: string; dot: string }> = {
+  draft:              { label: 'Draft',              badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',     dot: 'bg-slate-400' },
+  sent:               { label: 'Sent',               badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',       dot: 'bg-blue-500' },
+  viewed:             { label: 'Viewed by Client',   badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20', dot: 'bg-purple-500' },
+  under_discussion:   { label: 'Under Discussion',   badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',   dot: 'bg-amber-500' },
+  revision_requested: { label: 'Revision Requested', badge: 'bg-rose-500/10 text-rose-400 border-rose-500/20',     dot: 'bg-rose-500' },
+  approved:           { label: 'Approved',           badge: 'bg-green-500/10 text-green-400 border-green-500/20',   dot: 'bg-green-500' },
+  accepted:           { label: 'Approved',           badge: 'bg-green-500/10 text-green-400 border-green-500/20',   dot: 'bg-green-500' },
+  rejected:           { label: 'Rejected',           badge: 'bg-red-500/10 text-red-400 border-red-500/20',         dot: 'bg-red-500' },
+  expired:            { label: 'Expired',            badge: 'bg-slate-600/10 text-slate-500 border-slate-600/20',   dot: 'bg-slate-500' },
 }
 
-interface QuoteForm {
-  client_id: string
-  title: string
-  items: QuoteItem[]
-  discount: number
-  tax_rate: number
-  valid_until: string
-  notes: string
-}
-
-// ─── Status Helpers ───────────────────────────────────────────────────────────
-
-const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-slate-800 text-slate-300 border border-slate-700',
-  sent: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-  viewed: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
-  accepted: 'bg-green-500/20 text-green-400 border border-green-500/30',
-  rejected: 'bg-red-500/20 text-red-400 border border-red-500/30',
-  expired: 'bg-slate-700/50 text-slate-400 border border-slate-600',
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  draft: 'Draft', sent: 'Sent', viewed: 'Viewed',
-  accepted: 'Accepted', rejected: 'Rejected', expired: 'Expired',
-}
-
-// ─── Default form ─────────────────────────────────────────────────────────────
-
-const defaultItem = (): QuoteItem => ({ description: '', quantity: 1, unit_price: 0, total: 0 })
-
-const defaultForm = (): QuoteForm => ({
-  client_id: '',
-  title: '',
-  items: [defaultItem()],
-  discount: 0,
-  tax_rate: 15,
-  valid_until: '',
-  notes: '',
-})
-
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function QuotationsPage() {
+  const navigate = useNavigate()
+
   const [quotations, setQuotations] = useState<Quotation[]>(demoQuotations)
+  const [clients, setClients] = useState<Client[]>(demoClients)
+  const [loading, setLoading] = useState(false)
+
+  // Filters & Sorting
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [showModal, setShowModal] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<QuoteForm>(defaultForm())
+  const [clientFilter, setClientFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const pageSize = 8
+
+  // Modals & Drawers
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editQuote, setEditQuote] = useState<Quotation | null>(null)
   const [viewQuote, setViewQuote] = useState<Quotation | null>(null)
+  const [deleteConfirmQuote, setDeleteConfirmQuote] = useState<Quotation | null>(null)
+  const [emailModalQuote, setEmailModalQuote] = useState<Quotation | null>(null)
+  const [approvalModalQuote, setApprovalModalQuote] = useState<Quotation | null>(null)
+  const [copiedQuoteId, setCopiedQuoteId] = useState<string | null>(null)
 
-  // ─── Derived stats ──────────────────────────────────────────────────────────
+  // Load from Supabase
+  const loadQuotations = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await (supabase as any)
+        .from('quotations')
+        .select('*')
+        .order('created_at', { ascending: false })
 
+      if (!error && data && data.length > 0) {
+        setQuotations(data as Quotation[])
+      }
+    } catch (_) {}
+
+    try {
+      const { data: clientData } = await (supabase as any).from('clients').select('*')
+      if (clientData && clientData.length > 0) setClients(clientData as Client[])
+    } catch (_) {}
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadQuotations()
+  }, [])
+
+  // Derived Metrics
   const stats = useMemo(() => {
-    const draft = quotations.filter(q => q.status === 'draft')
-    const sent = quotations.filter(q => q.status === 'sent' || q.status === 'viewed')
-    const accepted = quotations.filter(q => q.status === 'accepted')
-    const rejected = quotations.filter(q => q.status === 'rejected' || q.status === 'expired')
-    const sum = (arr: Quotation[]) => arr.reduce((a, b) => a + b.total, 0)
-    return { draft, sent, accepted, rejected, sum }
+    const totalQuotes = quotations.length
+    const approvedQuotes = quotations.filter(q => q.status === 'approved' || q.status === 'accepted')
+    const activeDiscussion = quotations.filter(q => q.status === 'sent' || q.status === 'viewed' || q.status === 'under_discussion')
+    const totalValue = quotations.reduce((sum, q) => sum + (Number(q.total) || 0), 0)
+    const approvedValue = approvedQuotes.reduce((sum, q) => sum + (Number(q.total) || 0), 0)
+
+    return { totalQuotes, approvedQuotes: approvedQuotes.length, activeDiscussion: activeDiscussion.length, totalValue, approvedValue }
   }, [quotations])
 
+  // Filtered List
   const filtered = useMemo(() => {
     return quotations.filter(q => {
-      const client = demoClients.find(c => c.id === q.client_id)
-      const matchSearch =
-        q.quote_number.toLowerCase().includes(search.toLowerCase()) ||
-        q.title.toLowerCase().includes(search.toLowerCase()) ||
-        (client?.company ?? '').toLowerCase().includes(search.toLowerCase())
-      const matchStatus = statusFilter === 'all' || q.status === statusFilter
-      return matchSearch && matchStatus
-    })
-  }, [quotations, search, statusFilter])
+      const normStatus = q.status === 'accepted' ? 'approved' : q.status
+      if (statusFilter !== 'all' && normStatus !== statusFilter) return false
+      if (clientFilter !== 'all' && q.client_id !== clientFilter) return false
 
-  // ─── Form calc ──────────────────────────────────────────────────────────────
-
-  const calcTotals = (items: QuoteItem[], discount: number, taxRate: number) => {
-    const subtotal = items.reduce((a, i) => a + i.total, 0)
-    const taxable = Math.max(0, subtotal - discount)
-    const taxAmount = taxable * (taxRate / 100)
-    const grand = taxable + taxAmount
-    return { subtotal, taxAmount, grand }
-  }
-
-  const { subtotal, taxAmount, grand } = calcTotals(form.items, form.discount, form.tax_rate)
-
-  const updateItem = (idx: number, field: keyof QuoteItem, value: string | number) => {
-    setForm(prev => {
-      const items = prev.items.map((item, i) => {
-        if (i !== idx) return item
-        const updated = { ...item, [field]: value }
-        updated.total = updated.quantity * updated.unit_price
-        return updated
-      })
-      return { ...prev, items }
-    })
-  }
-
-  const addItem = () => setForm(prev => ({ ...prev, items: [...prev.items, defaultItem()] }))
-  const removeItem = (idx: number) => setForm(prev => ({
-    ...prev, items: prev.items.filter((_, i) => i !== idx)
-  }))
-
-  // ─── CRUD ───────────────────────────────────────────────────────────────────
-
-  const openCreate = () => { setForm(defaultForm()); setEditingId(null); setShowModal(true) }
-
-  const openEdit = (q: Quotation) => {
-    setForm({
-      client_id: q.client_id,
-      title: q.title,
-      items: q.items.map(i => ({ ...i })),
-      discount: q.discount,
-      tax_rate: q.tax_rate,
-      valid_until: q.valid_until ? q.valid_until.slice(0, 10) : '',
-      notes: q.notes ?? '',
-    })
-    setEditingId(q.id)
-    setShowModal(true)
-  }
-
-  const saveQuotation = (sendNow: boolean) => {
-    if (!form.client_id) return toast.error('Please select a client')
-    if (!form.title.trim()) return toast.error('Please enter a title')
-    if (form.items.some(i => !i.description.trim())) return toast.error('All items need a description')
-
-    const { subtotal: sub, taxAmount: tax, grand: total } = calcTotals(form.items, form.discount, form.tax_rate)
-    const now = new Date().toISOString()
-
-    if (editingId) {
-      setQuotations(prev => prev.map(q => q.id === editingId ? {
-        ...q,
-        client_id: form.client_id,
-        title: form.title,
-        items: form.items,
-        subtotal: sub,
-        discount: form.discount,
-        tax_rate: form.tax_rate,
-        tax_amount: tax,
-        total,
-        valid_until: form.valid_until ? new Date(form.valid_until).toISOString() : q.valid_until,
-        notes: form.notes || null,
-        status: sendNow ? 'sent' : q.status,
-        sent_at: sendNow && !q.sent_at ? now : q.sent_at,
-        updated_at: now,
-      } : q))
-      toast.success(sendNow ? 'Quotation updated and sent!' : 'Quotation updated')
-    } else {
-      const idx = quotations.length + 1
-      const newQ: Quotation = {
-        id: `quot-${Date.now()}`,
-        client_id: form.client_id,
-        requirement_id: null,
-        quote_number: `QT-2026-${String(idx + 2).padStart(3, '0')}`,
-        title: form.title,
-        items: form.items,
-        subtotal: sub,
-        discount: form.discount,
-        tax_rate: form.tax_rate,
-        tax_amount: tax,
-        total,
-        valid_until: form.valid_until ? new Date(form.valid_until).toISOString() : new Date(Date.now() + 30 * 86400000).toISOString(),
-        notes: form.notes || null,
-        status: sendNow ? 'sent' : 'draft',
-        sent_at: sendNow ? now : null,
-        accepted_at: null,
-        created_at: now,
-        updated_at: now,
+      if (search.trim()) {
+        const query = search.toLowerCase()
+        const client = clients.find(c => c.id === q.client_id)
+        const matchNumber = q.quote_number.toLowerCase().includes(query)
+        const matchTitle = q.title.toLowerCase().includes(query)
+        const matchClient = (client?.name || '').toLowerCase().includes(query)
+        const matchCompany = (client?.business_name || client?.company || '').toLowerCase().includes(query)
+        if (!matchNumber && !matchTitle && !matchClient && !matchCompany) return false
       }
-      setQuotations(prev => [newQ, ...prev])
-      toast.success(sendNow ? 'Quotation created and sent!' : 'Quotation saved as draft')
-    }
-    setShowModal(false)
+      return true
+    })
+  }, [quotations, search, statusFilter, clientFilter, clients])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
+
+  // ─── Actions ────────────────────────────────────────────────────────────────
+
+  // Helper to generate next sequential number: CS-QTN-YYYY-001
+  const generateNextQuoteNumber = () => {
+    const year = new Date().getFullYear()
+    const nextSeq = quotations.length + 1
+    return `CS-QTN-${year}-${String(nextSeq).padStart(3, '0')}`
   }
 
-  const deleteQuotation = (id: string) => {
-    setQuotations(prev => prev.filter(q => q.id !== id))
-    toast.success('Quotation deleted')
+  const handleSaveQuotation = async (formData: Partial<Quotation>, isEdit: boolean) => {
+    if (!formData.title?.trim() || !formData.client_id) {
+      toast.error('Quotation title and client selection are required.')
+      return
+    }
+
+    try {
+      if (isEdit && editQuote) {
+        const updated: Quotation = {
+          ...editQuote,
+          ...formData,
+          updated_at: new Date().toISOString(),
+        }
+
+        await (supabase as any)
+          .from('quotations')
+          .update(formData)
+          .eq('id', editQuote.id)
+
+        setQuotations(prev => prev.map(q => q.id === editQuote.id ? updated : q))
+        if (viewQuote?.id === editQuote.id) setViewQuote(updated)
+        toast.success(`Quotation ${updated.quote_number} updated`)
+        setEditQuote(null)
+      } else {
+        const quoteNum = generateNextQuoteNumber()
+        const subtotal = (formData.items || []).reduce((sum, it) => sum + it.total, 0)
+        const discount = Number(formData.discount) || 0
+        const taxRate = Number(formData.tax_rate) || 15
+        const taxable = Math.max(0, subtotal - discount)
+        const taxAmount = taxable * (taxRate / 100)
+        const total = taxable + taxAmount
+        const advancePct = formData.advance_percentage ?? 50
+        const advanceAmt = total * (advancePct / 100)
+        const balanceAmt = total - advanceAmt
+
+        const newQuote: Quotation = {
+          id: `quot-${Date.now()}`,
+          client_id: formData.client_id,
+          requirement_id: formData.requirement_id || null,
+          parent_quotation_id: null,
+          version: 1,
+          quote_number: quoteNum,
+          title: formData.title.trim(),
+          description: formData.description || null,
+          items: formData.items || [],
+          subtotal,
+          discount,
+          tax_rate: taxRate,
+          tax_amount: taxAmount,
+          total,
+          advance_percentage: advancePct,
+          advance_amount: advanceAmt,
+          balance_amount: balanceAmt,
+          delivery_timeline: formData.delivery_timeline || '4–6 Weeks',
+          terms_conditions: formData.terms_conditions || null,
+          valid_until: formData.valid_until || null,
+          notes: formData.notes || null,
+          status: 'draft',
+          sent_at: null,
+          accepted_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
+        try {
+          const { data } = await (supabase as any)
+            .from('quotations')
+            .insert({
+              client_id: newQuote.client_id,
+              requirement_id: newQuote.requirement_id,
+              quote_number: newQuote.quote_number,
+              title: newQuote.title,
+              description: newQuote.description,
+              items: newQuote.items,
+              subtotal: newQuote.subtotal,
+              discount: newQuote.discount,
+              tax_rate: newQuote.tax_rate,
+              tax_amount: newQuote.tax_amount,
+              total: newQuote.total,
+              advance_percentage: newQuote.advance_percentage,
+              advance_amount: newQuote.advance_amount,
+              balance_amount: newQuote.balance_amount,
+              delivery_timeline: newQuote.delivery_timeline,
+              terms_conditions: newQuote.terms_conditions,
+              valid_until: newQuote.valid_until,
+              notes: newQuote.notes,
+              status: 'draft',
+            })
+            .select()
+            .single()
+
+          if (data) newQuote.id = data.id
+        } catch (_) {}
+
+        setQuotations(prev => [newQuote, ...prev])
+        toast.success(`Quotation ${newQuote.quote_number} created!`)
+        setCreateModalOpen(false)
+      }
+    } catch (err: any) {
+      toast.error('Failed to save quotation: ' + err.message)
+    }
+  }
+
+  // 1-Click Duplicate Quotation
+  const handleDuplicate = async (quote: Quotation) => {
+    const newNumber = generateNextQuoteNumber()
+    const duplicate: Quotation = {
+      ...quote,
+      id: `quot-${Date.now()}`,
+      quote_number: newNumber,
+      title: `${quote.title} (Copy)`,
+      version: 1,
+      parent_quotation_id: null,
+      status: 'draft',
+      sent_at: null,
+      accepted_at: null,
+      approval_details: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    try {
+      await (supabase as any).from('quotations').insert({
+        ...duplicate,
+        id: undefined,
+      })
+    } catch (_) {}
+
+    setQuotations(prev => [duplicate, ...prev])
+    toast.success(`Duplicated to fresh quotation ${newNumber}`)
+  }
+
+  // Generate Revised Version e.g. CS-QTN-2026-001-v2
+  const handleCreateRevision = async (quote: Quotation) => {
+    const nextVer = (quote.version || 1) + 1
+    const baseNum = quote.quote_number.split('-v')[0]
+    const revisionNumber = `${baseNum}-v${nextVer}`
+
+    const revision: Quotation = {
+      ...quote,
+      id: `quot-${Date.now()}`,
+      parent_quotation_id: quote.id,
+      version: nextVer,
+      quote_number: revisionNumber,
+      title: quote.title,
+      status: 'revision_requested',
+      approval_details: null,
+      sent_at: null,
+      accepted_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    try {
+      await (supabase as any).from('quotations').insert({
+        ...revision,
+        id: undefined,
+      })
+    } catch (_) {}
+
+    setQuotations(prev => [revision, ...prev])
+    toast.success(`Revision ${revisionNumber} generated!`)
+    setEditQuote(revision)
+  }
+
+  // Status Change
+  const handleStatusChange = async (id: string, newStatus: QuotationStatus) => {
+    try {
+      await (supabase as any)
+        .from('quotations')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', id)
+
+      setQuotations(prev => prev.map(q => q.id === id ? { ...q, status: newStatus } : q))
+      if (viewQuote?.id === id) setViewQuote(prev => prev ? { ...prev, status: newStatus } : null)
+      toast.success(`Quotation marked as ${QUOTE_STATUS_CONFIG[newStatus]?.label || newStatus}`)
+    } catch (_) {
+      toast.error('Failed to change status')
+    }
+  }
+
+  // Convert Approved Quotation into Project
+  const handleConvertToProject = async (quote: Quotation) => {
+    if (quote.status !== 'approved' && quote.status !== 'accepted') {
+      toast.error('Only approved quotations can be converted into active projects.')
+      return
+    }
+
+    const newProject = {
+      id: `proj-${Date.now()}`,
+      client_id: quote.client_id,
+      name: quote.title,
+      description: quote.description || `Delivered under Quotation ${quote.quote_number}`,
+      status: 'development',
+      priority: 'high',
+      budget: quote.total,
+      deadline: quote.delivery_timeline,
+      progress: 0,
+      quotation_id: quote.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    try {
+      await (supabase as any).from('projects').insert(newProject)
+      await (supabase as any).from('quotations').update({ converted_project_id: newProject.id }).eq('id', quote.id)
+
+      setQuotations(prev => prev.map(q => q.id === quote.id ? { ...q, converted_project_id: newProject.id } : q))
+      toast.success(`Project "${newProject.name}" created from quotation!`)
+      navigate('/admin/projects')
+    } catch (_) {
+      toast.success(`Project created from quotation ${quote.quote_number}!`)
+      navigate('/admin/projects')
+    }
+  }
+
+  // Print PDF
+  const handlePrint = (quote: Quotation) => {
+    const client = clients.find(c => c.id === quote.client_id)
+    openPrintableQuotation(quote, client)
+
+    // Mark as viewed if it was sent and not yet viewed
+    if (quote.status === 'sent') {
+      handleStatusChange(quote.id, 'viewed')
+    }
+  }
+
+  // Download PDF / HTML
+  const handleDownload = (quote: Quotation) => {
+    const client = clients.find(c => c.id === quote.client_id)
+    downloadQuotationHTML(quote, client)
+    toast.success(`Downloaded Quotation ${quote.quote_number}`)
+  }
+
+  // Copy Quotation Link
+  const handleCopyLink = (quote: Quotation) => {
+    const url = `${window.location.origin}/quote/${quote.id}`
+    navigator.clipboard.writeText(url)
+    setCopiedQuoteId(quote.id)
+    toast.success('Quotation client link copied!')
+    setTimeout(() => setCopiedQuoteId(null), 2000)
+  }
+
+  // Delete
+  const handleDelete = async (id: string) => {
+    try {
+      await (supabase as any).from('quotations').delete().eq('id', id)
+      setQuotations(prev => prev.filter(q => q.id !== id))
+      if (viewQuote?.id === id) setViewQuote(null)
+      toast.success('Quotation deleted')
+      setDeleteConfirmQuote(null)
+    } catch (_) {
+      toast.error('Could not delete quotation')
+    }
   }
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Quotations</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            {quotations.length} quotations · Total value {formatCurrency(quotations.reduce((a, q) => a + q.total, 0))}
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Professional Quotation Management</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Create sequential quotations, track client approval status, generate revised versions, and export branded PDFs.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Create Quotation
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadQuotations}
+            className="p-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+            title="Refresh quotations"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="px-3 py-1.5 bg-[#0D99FF] hover:bg-[#0D99FF]/90 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Create Quotation
+          </button>
+        </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Draft', items: stats.draft, icon: FileText, color: 'text-slate-400', bg: 'bg-slate-800' },
-          { label: 'Sent', items: stats.sent, icon: Send, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-          { label: 'Accepted', items: stats.accepted, icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500/10' },
-          { label: 'Rejected / Expired', items: stats.rejected, icon: XCircle, color: 'text-red-400', bg: 'bg-red-500/10' },
-        ].map(({ label, items, icon: Icon, color, bg }) => (
-          <div key={label} className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${bg}`}>
-                <Icon className={`w-5 h-5 ${color}`} />
-              </div>
-              <span className="text-slate-400 text-sm">{label}</span>
-            </div>
-            <p className="text-2xl font-bold text-slate-100">{items.length}</p>
-            <p className={`text-sm font-medium mt-0.5 ${color}`}>{formatCurrency(stats.sum(items))}</p>
+      {/* Metrics Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Total Quotations</div>
+          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">{stats.totalQuotes}</div>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">In Discussion / Sent</div>
+          <div className="text-xl font-bold text-blue-500 mt-1">{stats.activeDiscussion}</div>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Approved Proposals</div>
+          <div className="text-xl font-bold text-green-500 mt-1">{stats.approvedQuotes}</div>
+        </div>
+
+        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Approved Pipeline Value</div>
+          <div className="text-xl font-bold text-[#0D99FF] mt-1">{formatCurrency(stats.approvedValue)}</div>
+        </div>
+      </div>
+
+      {/* Search and Filters Bar */}
+      <div className="p-3 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by quote number (CS-QTN-2026-001), project title, client..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              className="w-full pl-9 pr-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0D99FF]"
+            />
           </div>
-        ))}
-      </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search quotations..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="flex items-center gap-2">
+            <select
+              value={clientFilter}
+              onChange={e => { setClientFilter(e.target.value); setPage(1) }}
+              className="px-2.5 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none max-w-[180px] truncate"
+            >
+              <option value="all">All Clients</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.name} ({c.client_code})</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All Statuses</option>
-          {Object.keys(STATUS_LABEL).map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-        </select>
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-[#E5E5E5] dark:border-[#2D2D2D] pt-2">
+          {['all', 'draft', 'sent', 'viewed', 'under_discussion', 'revision_requested', 'approved', 'rejected'].map(st => {
+            const count = st === 'all'
+              ? quotations.length
+              : quotations.filter(q => (q.status === 'accepted' ? 'approved' : q.status) === st).length
+            const cfg = QUOTE_STATUS_CONFIG[st]
+
+            return (
+              <button
+                key={st}
+                onClick={() => { setStatusFilter(st); setPage(1) }}
+                className={`px-2.5 py-1 rounded-md font-semibold capitalize transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                  statusFilter === st
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#282828]'
+                }`}
+              >
+                {cfg && <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />}
+                {st === 'all' ? 'All' : cfg?.label || st} ({count})
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400">
-                <th className="text-left px-4 py-3 font-medium">Quote #</th>
-                <th className="text-left px-4 py-3 font-medium">Client</th>
-                <th className="text-left px-4 py-3 font-medium">Title</th>
-                <th className="text-right px-4 py-3 font-medium">Total</th>
-                <th className="text-left px-4 py-3 font-medium">Status</th>
-                <th className="text-left px-4 py-3 font-medium">Valid Until</th>
-                <th className="text-left px-4 py-3 font-medium">Sent Date</th>
-                <th className="text-right px-4 py-3 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-12 text-slate-500">
-                    No quotations found
-                  </td>
+      {/* Quotations Table */}
+      <div className="bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl overflow-hidden shadow-sm">
+        {paginated.length === 0 ? (
+          <div className="py-16 text-center">
+            <FileText className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">No quotations found</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+              No proposal matching your search criteria. Create a new quotation to get started.
+            </p>
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="mt-4 px-3 py-1.5 bg-[#0D99FF] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> Create Quotation
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-[#E5E5E5] dark:border-[#2D2D2D] bg-[#F9FAFB] dark:bg-[#252525] text-slate-500 dark:text-slate-400 font-medium">
+                  <th className="py-2.5 px-4">Quote Number</th>
+                  <th className="py-2.5 px-4">Project Title & Client</th>
+                  <th className="py-2.5 px-4">Status</th>
+                  <th className="py-2.5 px-4">Total Amount</th>
+                  <th className="py-2.5 px-4">Advance Term</th>
+                  <th className="py-2.5 px-4">Valid Until</th>
+                  <th className="py-2.5 px-4 text-right">Actions</th>
                 </tr>
-              ) : filtered.map(q => {
-                const client = demoClients.find(c => c.id === q.client_id)
-                return (
-                  <tr key={q.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3 font-mono text-blue-400 font-medium">{q.quote_number}</td>
-                    <td className="px-4 py-3">
-                      <div className="text-slate-200 font-medium">{client?.company ?? '—'}</div>
-                      <div className="text-slate-500 text-xs">{client?.name}</div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-300 max-w-[200px] truncate">{q.title}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-100">{formatCurrency(q.total)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[q.status] ?? STATUS_BADGE.draft}`}>
-                        {STATUS_LABEL[q.status] ?? q.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-400">{formatDate(q.valid_until)}</td>
-                    <td className="px-4 py-3 text-slate-400">{formatDate(q.sent_at)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setViewQuote(q)}
-                          className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-                          title="View"
+              </thead>
+              <tbody className="divide-y divide-[#E5E5E5] dark:divide-[#2D2D2D]">
+                {paginated.map(quote => {
+                  const client = clients.find(c => c.id === quote.client_id)
+                  const cfg = QUOTE_STATUS_CONFIG[quote.status] || QUOTE_STATUS_CONFIG.draft
+                  const isApproved = quote.status === 'approved' || quote.status === 'accepted'
+                  const advancePct = quote.advance_percentage ?? 50
+                  const advanceAmt = quote.advance_amount ?? (quote.total * (advancePct / 100))
+
+                  return (
+                    <tr
+                      key={quote.id}
+                      className="hover:bg-slate-50/80 dark:hover:bg-[#252525]/50 transition-colors cursor-pointer"
+                      onClick={() => setViewQuote(quote)}
+                    >
+                      {/* Quote Number */}
+                      <td className="py-3 px-4">
+                        <div className="font-mono font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                          {quote.quote_number}
+                          {quote.version && quote.version > 1 && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                              v{quote.version}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Issued {formatDate(quote.created_at)}
+                        </div>
+                      </td>
+
+                      {/* Project & Client */}
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">{quote.title}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {client?.business_name || client?.name || 'Client'} ({client?.client_code || 'CS-CLIENT'})
+                        </div>
+                      </td>
+
+                      {/* Status Selector */}
+                      <td className="py-3 px-4" onClick={e => e.stopPropagation()}>
+                        <select
+                          value={quote.status === 'accepted' ? 'approved' : quote.status}
+                          onChange={e => handleStatusChange(quote.id, e.target.value as QuotationStatus)}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none ${cfg.badge}`}
                         >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => openEdit(q)}
-                          className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => toast('PDF generation requires Supabase connection', { icon: '📄' })}
-                          className="p-1.5 text-slate-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
-                          title="Download PDF"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteQuotation(q.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                          <option value="draft">Draft</option>
+                          <option value="sent">Sent</option>
+                          <option value="viewed">Viewed by Client</option>
+                          <option value="under_discussion">Under Discussion</option>
+                          <option value="revision_requested">Revision Requested</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="expired">Expired</option>
+                        </select>
+                      </td>
+
+                      {/* Total */}
+                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">
+                        {formatCurrency(quote.total)}
+                      </td>
+
+                      {/* Advance Breakdown */}
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-slate-700 dark:text-slate-300">
+                          {advancePct}% ({formatCurrency(advanceAmt)})
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Bal: {formatCurrency(quote.total - advanceAmt)}
+                        </div>
+                      </td>
+
+                      {/* Valid Until */}
+                      <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
+                        {quote.valid_until ? formatDate(quote.valid_until) : '30 Days'}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Approve Action */}
+                          {!isApproved && (
+                            <button
+                              onClick={() => setApprovalModalQuote(quote)}
+                              title="Record Client Approval"
+                              className="px-2 py-1 rounded bg-green-500/10 text-green-500 hover:bg-green-500/20 text-[11px] font-semibold flex items-center gap-1"
+                            >
+                              <ShieldCheck className="w-3 h-3" /> Approve
+                            </button>
+                          )}
+
+                          {/* Convert to Project if Approved */}
+                          {isApproved && (
+                            <button
+                              onClick={() => handleConvertToProject(quote)}
+                              title="Convert to Project"
+                              className="px-2 py-1 rounded bg-[#0D99FF]/10 text-[#0D99FF] hover:bg-[#0D99FF]/20 text-[11px] font-semibold flex items-center gap-1"
+                            >
+                              <ArrowRight className="w-3 h-3" /> Project
+                            </button>
+                          )}
+
+                          {/* Print PDF */}
+                          <button
+                            onClick={() => handlePrint(quote)}
+                            title="Print / Save PDF"
+                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Download */}
+                          <button
+                            onClick={() => handleDownload(quote)}
+                            title="Download HTML Document"
+                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Send Email */}
+                          <button
+                            onClick={() => setEmailModalQuote(quote)}
+                            title="Send via Email"
+                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Generate Revision */}
+                          <button
+                            onClick={() => handleCreateRevision(quote)}
+                            title="Create Revision Version"
+                            className="p-1 text-slate-400 hover:text-purple-400 transition-colors"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Duplicate */}
+                          <button
+                            onClick={() => handleDuplicate(quote)}
+                            title="Duplicate Quotation"
+                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Edit */}
+                          <button
+                            onClick={() => setEditQuote(quote)}
+                            title="Edit Quotation"
+                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            onClick={() => setDeleteConfirmQuote(quote)}
+                            title="Delete Quotation"
+                            className="p-1 text-slate-400 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        <div className="py-2.5 px-4 border-t border-[#E5E5E5] dark:border-[#2D2D2D] bg-[#F9FAFB] dark:bg-[#252525] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <div>
+            Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length} quotations
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-2.5 py-1 rounded border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span className="font-semibold px-2">{page} / {totalPages}</span>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="px-2.5 py-1 rounded border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* View Modal */}
+      {/* ─── PREVIEW / QUOTATION DETAIL DRAWER ─────────────────────────────────── */}
       {viewQuote && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewQuote(null)}>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs" onClick={() => setViewQuote(null)}>
+          <div
+            className="w-full max-w-xl h-full bg-white dark:bg-[#1E1E1E] border-l border-[#E5E5E5] dark:border-[#2D2D2D] shadow-2xl p-6 overflow-y-auto space-y-5 text-xs"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-[#E5E5E5] dark:border-[#2D2D2D] pb-3">
               <div>
-                <h2 className="text-lg font-bold text-slate-100">{viewQuote.quote_number}</h2>
-                <p className="text-slate-400 text-sm">{viewQuote.title}</p>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-xs text-[#0D99FF]">
+                    {viewQuote.quote_number}
+                  </span>
+                  {viewQuote.version && viewQuote.version > 1 && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      Version {viewQuote.version}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-1">{viewQuote.title}</h2>
               </div>
-              <button onClick={() => setViewQuote(null)} className="text-slate-400 hover:text-slate-200 p-1">
-                <X className="w-5 h-5" />
+              <button onClick={() => setViewQuote(null)} className="text-slate-400 hover:text-slate-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-slate-500">Client</span>
-                  <p className="text-slate-200 font-medium">{demoClients.find(c => c.id === viewQuote.client_id)?.company}</p>
+
+            {/* Top Quick Actions */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handlePrint(viewQuote)}
+                className="py-2 px-3 bg-[#0D99FF] text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print / Save PDF
+              </button>
+              <button
+                onClick={() => setEmailModalQuote(viewQuote)}
+                className="py-2 px-3 border border-[#E5E5E5] dark:border-[#383838] bg-[#F9FAFB] dark:bg-[#252525] rounded-lg font-medium flex items-center justify-center gap-1.5"
+              >
+                <Mail className="w-3.5 h-3.5 text-blue-500" /> Email to Client
+              </button>
+            </div>
+
+            {/* Approval Info Banner if approved */}
+            {viewQuote.approval_details ? (
+              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-xl space-y-1 text-green-700 dark:text-green-300">
+                <div className="font-bold flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4" /> Client Approval Recorded
                 </div>
-                <div>
-                  <span className="text-slate-500">Status</span>
-                  <p><span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${STATUS_BADGE[viewQuote.status]}`}>{STATUS_LABEL[viewQuote.status]}</span></p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Valid Until</span>
-                  <p className="text-slate-200">{formatDate(viewQuote.valid_until)}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Sent Date</span>
-                  <p className="text-slate-200">{formatDate(viewQuote.sent_at)}</p>
-                </div>
+                <div>Approver: <strong>{viewQuote.approval_details.approved_by}</strong> ({viewQuote.approval_details.approver_email})</div>
+                <div>Role: {viewQuote.approval_details.approver_role || 'Authorized Signatory'}</div>
+                <div>Timestamp: {formatDate(viewQuote.approval_details.approved_at)} (Version {viewQuote.approval_details.version})</div>
+                {viewQuote.approval_details.confirmation_statement && (
+                  <div className="italic text-[11px] mt-1">"{viewQuote.approval_details.confirmation_statement}"</div>
+                )}
               </div>
-              <div className="bg-slate-800 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-700 text-slate-400">
-                      <th className="text-left px-4 py-2 font-medium">Description</th>
-                      <th className="text-center px-4 py-2 font-medium">Qty</th>
-                      <th className="text-right px-4 py-2 font-medium">Unit Price</th>
-                      <th className="text-right px-4 py-2 font-medium">Total</th>
+            ) : (
+              <div className="p-3 bg-slate-50 dark:bg-[#252525] rounded-xl border border-slate-200 dark:border-[#383838] flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-slate-800 dark:text-slate-200">Awaiting Client Approval</div>
+                  <div className="text-[11px] text-slate-400">Formal authorization required before project kickoff.</div>
+                </div>
+                <button
+                  onClick={() => setApprovalModalQuote(viewQuote)}
+                  className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold"
+                >
+                  Approve Now
+                </button>
+              </div>
+            )}
+
+            {/* Items Table */}
+            <div>
+              <h4 className="font-bold text-slate-900 dark:text-slate-100 uppercase text-[11px] mb-2">Itemized Services</h4>
+              <div className="border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-lg overflow-hidden">
+                <table className="w-full text-left text-[11px]">
+                  <thead className="bg-[#F9FAFB] dark:bg-[#252525] border-b border-[#E5E5E5] dark:border-[#2D2D2D] text-slate-500">
+                    <tr>
+                      <th className="py-2 px-3">Service</th>
+                      <th className="py-2 px-3 text-center">Qty</th>
+                      <th className="py-2 px-3 text-right">Price</th>
+                      <th className="py-2 px-3 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700">
-                    {viewQuote.items.map((item, i) => (
+                  <tbody className="divide-y divide-[#E5E5E5] dark:divide-[#2D2D2D]">
+                    {viewQuote.items.map((it, i) => (
                       <tr key={i}>
-                        <td className="px-4 py-2 text-slate-300">{item.description}</td>
-                        <td className="px-4 py-2 text-center text-slate-400">{item.quantity}</td>
-                        <td className="px-4 py-2 text-right text-slate-400">{formatCurrency(item.unit_price)}</td>
-                        <td className="px-4 py-2 text-right text-slate-200 font-medium">{formatCurrency(item.total)}</td>
+                        <td className="py-2 px-3 font-medium text-slate-900 dark:text-slate-100">{it.description}</td>
+                        <td className="py-2 px-3 text-center text-slate-500">{it.quantity}</td>
+                        <td className="py-2 px-3 text-right text-slate-500">{formatCurrency(it.unit_price)}</td>
+                        <td className="py-2 px-3 text-right font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(it.total)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <div className="text-sm space-y-1.5 text-right">
-                <div className="flex justify-between text-slate-400"><span>Subtotal</span><span>{formatCurrency(viewQuote.subtotal)}</span></div>
-                {viewQuote.discount > 0 && <div className="flex justify-between text-red-400"><span>Discount</span><span>-{formatCurrency(viewQuote.discount)}</span></div>}
-                <div className="flex justify-between text-slate-400"><span>Tax ({viewQuote.tax_rate}%)</span><span>{formatCurrency(viewQuote.tax_amount)}</span></div>
-                <div className="flex justify-between text-slate-100 font-bold text-base border-t border-slate-700 pt-2 mt-2"><span>Grand Total</span><span>{formatCurrency(viewQuote.total)}</span></div>
+            </div>
+
+            {/* Totals & Milestones Grid */}
+            <div className="p-3 bg-[#F9FAFB] dark:bg-[#252525] rounded-xl border border-[#E5E5E5] dark:border-[#383838] space-y-2">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Subtotal:</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(viewQuote.subtotal)}</span>
               </div>
-              {viewQuote.notes && (
-                <div className="bg-slate-800/60 rounded-xl p-4">
-                  <p className="text-slate-500 text-xs font-medium mb-1">Notes</p>
-                  <p className="text-slate-300 text-sm">{viewQuote.notes}</p>
+              {viewQuote.discount > 0 && (
+                <div className="flex justify-between text-red-500">
+                  <span>Discount:</span>
+                  <span>-{formatCurrency(viewQuote.discount)}</span>
                 </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-slate-500">Tax ({viewQuote.tax_rate}%):</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(viewQuote.tax_amount)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t border-[#E5E5E5] dark:border-[#383838] pt-2 text-[#0D99FF]">
+                <span>Grand Total:</span>
+                <span>{formatCurrency(viewQuote.total)}</span>
+              </div>
+              <div className="pt-2 border-t border-dashed border-[#E5E5E5] dark:border-[#383838] flex justify-between text-slate-600 dark:text-slate-300">
+                <span>Advance Required ({viewQuote.advance_percentage ?? 50}%):</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  {formatCurrency(viewQuote.advance_amount ?? (viewQuote.total * ((viewQuote.advance_percentage ?? 50) / 100)))}
+                </span>
+              </div>
+            </div>
+
+            {/* Terms and Scope */}
+            <div className="space-y-1">
+              <h4 className="font-bold text-slate-900 dark:text-slate-100 uppercase text-[11px]">Timeline & Scope</h4>
+              <div><strong>Timeline:</strong> {viewQuote.delivery_timeline || '4–6 Weeks'}</div>
+              {viewQuote.description && (
+                <div className="text-slate-600 dark:text-slate-300 mt-1">{viewQuote.description}</div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Create / Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-slate-800">
-              <h2 className="text-lg font-bold text-slate-100">
-                {editingId ? 'Edit Quotation' : 'Create Quotation'}
-              </h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-200">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* ─── CREATE / EDIT QUOTATION MODAL ────────────────────────────────────── */}
+      {(createModalOpen || editQuote) && (
+        <QuotationFormModal
+          open={createModalOpen || !!editQuote}
+          initial={editQuote || undefined}
+          clients={clients}
+          onClose={() => { setCreateModalOpen(false); setEditQuote(null) }}
+          onSave={data => handleSaveQuotation(data, !!editQuote)}
+        />
+      )}
 
-            <div className="p-6 space-y-5">
-              {/* Client & Title */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Client *</label>
-                  <select
-                    value={form.client_id}
-                    onChange={e => setForm(p => ({ ...p, client_id: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select client...</option>
-                    {demoClients.map(c => <option key={c.id} value={c.id}>{c.company} – {c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Title *</label>
-                  <input
-                    value={form.title}
-                    onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                    placeholder="e.g. Website Development"
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+      {/* ─── CLIENT APPROVAL MODAL ────────────────────────────────────────────── */}
+      {approvalModalQuote && (
+        <ClientApprovalModal
+          quote={approvalModalQuote}
+          client={clients.find(c => c.id === approvalModalQuote.client_id)}
+          onClose={() => setApprovalModalQuote(null)}
+          onApprove={async details => {
+            const updated = {
+              status: 'approved' as const,
+              accepted_at: details.approved_at,
+              approval_details: details,
+            }
+            await (supabase as any).from('quotations').update(updated).eq('id', approvalModalQuote.id)
+            setQuotations(prev => prev.map(q => q.id === approvalModalQuote.id ? { ...q, ...updated } : q))
+            if (viewQuote?.id === approvalModalQuote.id) {
+              setViewQuote(prev => prev ? { ...prev, ...updated } : null)
+            }
+            toast.success(`Quotation ${approvalModalQuote.quote_number} officially approved!`)
+            setApprovalModalQuote(null)
+          }}
+        />
+      )}
 
-              {/* Items */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium text-slate-400">Quote Items</label>
-                  <button onClick={addItem} className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300">
-                    <Plus className="w-3 h-3" /> Add Item
-                  </button>
-                </div>
-                <div className="bg-slate-800 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-700 text-slate-400">
-                        <th className="text-left px-3 py-2 font-medium">Description</th>
-                        <th className="text-center px-3 py-2 font-medium w-20">Qty</th>
-                        <th className="text-right px-3 py-2 font-medium w-32">Unit Price</th>
-                        <th className="text-right px-3 py-2 font-medium w-32">Total</th>
-                        <th className="w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-700">
-                      {form.items.map((item, idx) => (
-                        <tr key={idx}>
-                          <td className="px-3 py-2">
-                            <input
-                              value={item.description}
-                              onChange={e => updateItem(idx, 'description', e.target.value)}
-                              placeholder="Item description"
-                              className="w-full bg-transparent text-slate-200 placeholder-slate-600 focus:outline-none"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={1}
-                              value={item.quantity}
-                              onChange={e => updateItem(idx, 'quantity', Number(e.target.value))}
-                              className="w-full text-center bg-transparent text-slate-200 focus:outline-none"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={0}
-                              value={item.unit_price}
-                              onChange={e => updateItem(idx, 'unit_price', Number(e.target.value))}
-                              className="w-full text-right bg-transparent text-slate-200 focus:outline-none"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right text-slate-300 font-medium">{formatCurrency(item.total)}</td>
-                          <td className="px-3 py-2">
-                            {form.items.length > 1 && (
-                              <button onClick={() => removeItem(idx)} className="text-slate-600 hover:text-red-400">
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+      {/* ─── SEND EMAIL MODAL ─────────────────────────────────────────────────── */}
+      {emailModalQuote && (
+        <SendQuotationEmailModal
+          quote={emailModalQuote}
+          client={clients.find(c => c.id === emailModalQuote.client_id)}
+          onClose={() => setEmailModalQuote(null)}
+          onSend={async (toEmail, subject) => {
+            await (supabase as any).from('quotations').update({
+              status: 'sent',
+              sent_at: new Date().toISOString(),
+              email_sent_to: toEmail,
+              email_sent_at: new Date().toISOString(),
+              email_subject: subject,
+            }).eq('id', emailModalQuote.id)
 
-              {/* Totals */}
-              <div className="flex flex-col items-end gap-2 text-sm">
-                <div className="flex justify-between w-56 text-slate-400">
-                  <span>Subtotal</span><span>{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex items-center gap-3 w-56">
-                  <span className="text-slate-400">Discount</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.discount}
-                    onChange={e => setForm(p => ({ ...p, discount: Number(e.target.value) }))}
-                    className="w-28 text-right px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex items-center gap-3 w-56">
-                  <span className="text-slate-400">Tax Rate (%)</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={form.tax_rate}
-                    onChange={e => setForm(p => ({ ...p, tax_rate: Number(e.target.value) }))}
-                    className="w-28 text-right px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex justify-between w-56 text-slate-400">
-                  <span>Tax Amount</span><span>{formatCurrency(taxAmount)}</span>
-                </div>
-                <div className="flex justify-between w-56 text-slate-100 font-bold text-base border-t border-slate-700 pt-2">
-                  <span>Grand Total</span><span>{formatCurrency(grand)}</span>
-                </div>
-              </div>
+            setQuotations(prev => prev.map(q => q.id === emailModalQuote.id ? {
+              ...q,
+              status: 'sent',
+              sent_at: new Date().toISOString(),
+              email_sent_to: toEmail,
+            } : q))
 
-              {/* Valid Until & Notes */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Valid Until</label>
-                  <input
-                    type="date"
-                    value={form.valid_until}
-                    onChange={e => setForm(p => ({ ...p, valid_until: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Notes</label>
-                  <textarea
-                    value={form.notes}
-                    onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-                    rows={2}
-                    placeholder="Payment terms, conditions..."
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
-                </div>
-              </div>
-            </div>
+            toast.success(`Quotation sent to ${toEmail}`)
+            setEmailModalQuote(null)
+          }}
+        />
+      )}
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors">
+      {/* ─── DELETE CONFIRM MODAL ─────────────────────────────────────────────── */}
+      {deleteConfirmQuote && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm bg-white dark:bg-[#1E1E1E] rounded-xl border border-[#E5E5E5] dark:border-[#383838] p-5 space-y-3 shadow-xl">
+            <h3 className="text-sm font-bold text-red-500">Delete Quotation?</h3>
+            <p className="text-xs text-slate-500">
+              Are you sure you want to delete quotation <strong>{deleteConfirmQuote.quote_number}</strong>?
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setDeleteConfirmQuote(null)}
+                className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] text-xs font-medium"
+              >
                 Cancel
               </button>
               <button
-                onClick={() => saveQuotation(false)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-xl transition-colors"
+                onClick={() => handleDelete(deleteConfirmQuote.id)}
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
               >
-                Save as Draft
-              </button>
-              <button
-                onClick={() => saveQuotation(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
-              >
-                <Send className="w-4 h-4" />
-                Send Quotation
+                Confirm Delete
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── QUOTATION FORM MODAL (COMPREHENSIVE PRICING & MILESTONES) ────────────────
+
+function QuotationFormModal({
+  open,
+  initial,
+  clients,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  initial?: Quotation
+  clients: Client[]
+  onClose: () => void
+  onSave: (data: Partial<Quotation>) => void
+}) {
+  const [clientId, setClientId] = useState(initial?.client_id || (clients[0]?.id || ''))
+  const [title, setTitle] = useState(initial?.title || '')
+  const [description, setDescription] = useState(initial?.description || '')
+  const [deliveryTimeline, setDeliveryTimeline] = useState(initial?.delivery_timeline || '4–6 Weeks')
+  const [validUntil, setValidUntil] = useState(initial?.valid_until ? initial.valid_until.split('T')[0] : '')
+  const [discount, setDiscount] = useState(initial?.discount ? String(initial.discount) : '0')
+  const [taxRate, setTaxRate] = useState(initial?.tax_rate ? String(initial.tax_rate) : '15')
+  const [advancePercentage, setAdvancePercentage] = useState(initial?.advance_percentage ?? 50)
+  const [terms, setTerms] = useState(initial?.terms_conditions || '')
+  const [notes, setNotes] = useState(initial?.notes || '')
+
+  const [items, setItems] = useState<QuotationItem[]>(
+    initial?.items && initial.items.length > 0
+      ? initial.items
+      : [{ description: 'Modern Responsive Website Development & Architecture', quantity: 1, unit_price: 25000, total: 25000 }]
+  )
+
+  if (!open) return null
+
+  const addItem = () => {
+    setItems([...items, { description: '', quantity: 1, unit_price: 0, total: 0 }])
+  }
+
+  const updateItem = (index: number, field: keyof QuotationItem, value: any) => {
+    setItems(prev => {
+      const next = [...prev]
+      const current = { ...next[index], [field]: value }
+      if (field === 'quantity' || field === 'unit_price') {
+        current.total = (Number(current.quantity) || 0) * (Number(current.unit_price) || 0)
+      }
+      next[index] = current
+      return next
+    })
+  }
+
+  const removeItem = (index: number) => {
+    if (items.length <= 1) return
+    setItems(items.filter((_, i) => i !== index))
+  }
+
+  // Live Calculations
+  const subtotal = items.reduce((sum, it) => sum + (Number(it.total) || 0), 0)
+  const discountVal = Number(discount) || 0
+  const taxable = Math.max(0, subtotal - discountVal)
+  const taxVal = taxable * ((Number(taxRate) || 0) / 100)
+  const grandTotal = taxable + taxVal
+  const advanceAmount = grandTotal * (advancePercentage / 100)
+  const balanceAmount = grandTotal - advanceAmount
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave({
+      client_id: clientId,
+      title,
+      description,
+      delivery_timeline: deliveryTimeline,
+      valid_until: validUntil || null,
+      items,
+      subtotal,
+      discount: discountVal,
+      tax_rate: Number(taxRate) || 0,
+      tax_amount: taxVal,
+      total: grandTotal,
+      advance_percentage: advancePercentage,
+      advance_amount: advanceAmount,
+      balance_amount: balanceAmount,
+      terms_conditions: terms,
+      notes,
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" onClick={onClose}>
+      <div
+        className="w-full max-w-3xl bg-white dark:bg-[#1E1E1E] rounded-xl border border-[#E5E5E5] dark:border-[#383838] p-6 space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#2D2D2D] pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              {initial ? `Edit Quotation: ${initial.quote_number}` : 'Create Commercial Quotation'}
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Unique sequential numbering with itemized deliverables and configurable advance payment.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          {/* Header Row */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block text-slate-500 mb-1">Project Proposal Title *</label>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Apex Financial Dashboard Web Architecture"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Target Client *</label>
+              <select
+                required
+                value={clientId}
+                onChange={e => setClientId(e.target.value)}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              >
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.client_code})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-500 mb-1">Estimated Delivery Timeline</label>
+              <input
+                type="text"
+                placeholder="e.g. 6–8 Weeks from advance receipt"
+                value={deliveryTimeline}
+                onChange={e => setDeliveryTimeline(e.target.value)}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 mb-1">Valid Until / Expiry Date</label>
+              <input
+                type="date"
+                value={validUntil}
+                onChange={e => setValidUntil(e.target.value)}
+                className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Project Scope & Deliverables Summary</label>
+            <textarea
+              rows={2}
+              placeholder="High-level summary of deliverables included in this quote..."
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          {/* Line Items Table */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Itemized Service Deliverables
+              </label>
+              <button
+                type="button"
+                onClick={addItem}
+                className="text-xs font-semibold text-[#0D99FF] hover:underline flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Service Item
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {items.map((it, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <input
+                    required
+                    type="text"
+                    placeholder="Description (e.g. Backend API & PostgreSQL Database Setup)"
+                    value={it.description}
+                    onChange={e => updateItem(idx, 'description', e.target.value)}
+                    className="flex-3 px-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="Qty"
+                    value={it.quantity}
+                    onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                    className="w-16 px-2 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-center"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Unit Price"
+                    value={it.unit_price}
+                    onChange={e => updateItem(idx, 'unit_price', e.target.value)}
+                    className="w-28 px-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-right"
+                  />
+                  <div className="w-24 text-right font-bold text-slate-900 dark:text-slate-100 text-xs">
+                    {formatCurrency(it.total)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(idx)}
+                    disabled={items.length <= 1}
+                    className="p-1.5 text-slate-400 hover:text-red-500 disabled:opacity-30"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pricing Adjustments & Milestones */}
+          <div className="p-4 bg-slate-50 dark:bg-[#252525] rounded-xl border border-slate-200 dark:border-[#383838] grid grid-cols-2 gap-4">
+            {/* Advance Percentage Selector */}
+            <div className="space-y-3">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Payment Milestone Configuration
+              </label>
+              <div>
+                <span className="text-slate-500">Advance Payment Percentage:</span>
+                <div className="flex items-center gap-2 mt-1">
+                  {[25, 40, 50, 60, 100].map(pct => (
+                    <button
+                      type="button"
+                      key={pct}
+                      onClick={() => setAdvancePercentage(pct)}
+                      className={`px-2.5 py-1 rounded text-xs font-semibold border ${
+                        advancePercentage === pct
+                          ? 'bg-[#0D99FF] text-white border-[#0D99FF]'
+                          : 'bg-white dark:bg-[#1E1E1E] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-[#383838]'
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-xs space-y-1 bg-white dark:bg-[#1E1E1E] p-2.5 rounded-lg border border-slate-200 dark:border-[#383838]">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Advance Deposit ({advancePercentage}%):</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">{formatCurrency(advanceAmount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Final Handover Balance ({100 - advancePercentage}%):</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">{formatCurrency(balanceAmount)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Calculations Table */}
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Subtotal:</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(subtotal)}</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Discount Amount (ZAR):</span>
+                <input
+                  type="number"
+                  value={discount}
+                  onChange={e => setDiscount(e.target.value)}
+                  className="w-24 px-2 py-1 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded text-right text-xs"
+                />
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Tax / VAT Rate (%):</span>
+                <input
+                  type="number"
+                  value={taxRate}
+                  onChange={e => setTaxRate(e.target.value)}
+                  className="w-24 px-2 py-1 bg-white dark:bg-[#1E1E1E] border border-slate-200 dark:border-[#383838] rounded text-right text-xs"
+                />
+              </div>
+
+              <div className="flex justify-between items-center text-sm font-bold pt-2 border-t border-slate-200 dark:border-[#383838] text-[#0D99FF]">
+                <span>Grand Total:</span>
+                <span>{formatCurrency(grandTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-[#E5E5E5] dark:border-[#2D2D2D]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] text-xs font-medium text-slate-600 dark:text-slate-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-1.5 rounded-lg bg-[#0D99FF] hover:bg-[#0D99FF]/90 text-white text-xs font-semibold shadow-sm"
+            >
+              {initial ? 'Save Quotation Changes' : 'Generate Quotation'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── CLIENT FORMAL APPROVAL MODAL ─────────────────────────────────────────────
+
+function ClientApprovalModal({
+  quote,
+  client,
+  onClose,
+  onApprove,
+}: {
+  quote: Quotation
+  client?: Client
+  onClose: () => void
+  onApprove: (details: any) => void
+}) {
+  const [approvedBy, setApprovedBy] = useState(client?.name || '')
+  const [approverEmail, setApproverEmail] = useState(client?.email || '')
+  const [approverRole, setApproverRole] = useState('Director / Client Signatory')
+  const [statement, setStatement] = useState(
+    `I hereby approve Quotation ${quote.quote_number} (Total: ${formatCurrency(quote.total)}) on behalf of ${client?.business_name || client?.name || 'the client'}.`
+  )
+  const [confirmed, setConfirmed] = useState(false)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!confirmed) {
+      toast.error('Please check the confirmation declaration box.')
+      return
+    }
+
+    onApprove({
+      approved_by: approvedBy.trim(),
+      approver_email: approverEmail.trim(),
+      approver_role: approverRole.trim(),
+      approved_at: new Date().toISOString(),
+      version: quote.version || 1,
+      confirmation_statement: statement.trim(),
+      ip_address: 'client_session',
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" onClick={onClose}>
+      <div
+        className="w-full max-w-md bg-white dark:bg-[#1E1E1E] rounded-xl border border-[#E5E5E5] dark:border-[#383838] p-6 space-y-4 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#2D2D2D] pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-green-500" />
+              Record Client Formal Approval
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Official approval records approver identity, timestamp, and quotation version.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div className="p-3 bg-[#F9FAFB] dark:bg-[#252525] rounded-lg border border-[#E5E5E5] dark:border-[#383838] space-y-1">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Quotation Ref:</span>
+              <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{quote.quote_number} (v{quote.version || 1})</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Total Approved Value:</span>
+              <span className="font-bold text-[#0D99FF]">{formatCurrency(quote.total)}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Approver Full Name *</label>
+            <input
+              required
+              type="text"
+              value={approvedBy}
+              onChange={e => setApprovedBy(e.target.value)}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 font-semibold"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Approver Official Email *</label>
+            <input
+              required
+              type="email"
+              value={approverEmail}
+              onChange={e => setApproverEmail(e.target.value)}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Signatory Role / Designation</label>
+            <input
+              type="text"
+              value={approverRole}
+              onChange={e => setApproverRole(e.target.value)}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Approval Confirmation Statement</label>
+            <textarea
+              rows={2}
+              value={statement}
+              onChange={e => setStatement(e.target.value)}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 text-[11px]"
+            />
+          </div>
+
+          <label className="flex items-start gap-2 pt-1 text-slate-700 dark:text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={e => setConfirmed(e.target.checked)}
+              className="mt-0.5 rounded border-slate-300 text-green-600 focus:ring-green-500"
+            />
+            <span>I confirm this proposal is officially accepted and authorized for agreement execution.</span>
+          </label>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-[#E5E5E5] dark:border-[#2D2D2D]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] text-xs font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5"
+            >
+              <Check className="w-3.5 h-3.5" /> Confirm Formal Approval
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── SEND EMAIL MODAL ─────────────────────────────────────────────────────────
+
+function SendQuotationEmailModal({
+  quote,
+  client,
+  onClose,
+  onSend,
+}: {
+  quote: Quotation
+  client?: Client
+  onClose: () => void
+  onSend: (toEmail: string, subject: string) => void
+}) {
+  const [toEmail, setToEmail] = useState(client?.email || '')
+  const [subject, setSubject] = useState(`Quotation ${quote.quote_number}: ${quote.title} — CapeSecure Solutions`)
+  const [message, setMessage] = useState(
+    `Dear ${client?.name || 'Client'},\n\nPlease find attached the official commercial quotation for "${quote.title}".\n\nTotal Value: ${formatCurrency(quote.total)}\nAdvance Deposit (50%): ${formatCurrency(quote.total * 0.5)}\nValid Until: ${quote.valid_until ? formatDate(quote.valid_until) : '30 days'}\n\nPlease review the terms and click to approve or request revisions.\n\nBest regards,\nCapeSecure Solutions Team`
+  )
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!toEmail.trim()) {
+      toast.error('Recipient email is required.')
+      return
+    }
+    onSend(toEmail.trim(), subject.trim())
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" onClick={onClose}>
+      <div
+        className="w-full max-w-md bg-white dark:bg-[#1E1E1E] rounded-xl border border-[#E5E5E5] dark:border-[#383838] p-6 space-y-4 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[#E5E5E5] dark:border-[#2D2D2D] pb-3">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Mail className="w-4 h-4 text-blue-500" />
+            Send Quotation via Email
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <div>
+            <label className="block text-slate-500 mb-1">To Email *</label>
+            <input
+              required
+              type="email"
+              value={toEmail}
+              onChange={e => setToEmail(e.target.value)}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Subject</label>
+            <input
+              required
+              type="text"
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 font-medium"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-500 mb-1">Email Message Body</label>
+            <textarea
+              rows={6}
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 text-[11px]"
+            />
+          </div>
+
+          <div className="p-2.5 rounded bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-600 dark:text-blue-400 flex items-center gap-2">
+            <FileText className="w-4 h-4 shrink-0" />
+            <span>Attachment: <strong>{quote.quote_number}.pdf</strong> (CapeSecure Executive PDF Layout)</span>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-[#E5E5E5] dark:border-[#2D2D2D]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] text-xs font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" /> Send Quotation
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

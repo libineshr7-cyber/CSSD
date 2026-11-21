@@ -221,7 +221,16 @@ export interface Requirement {
   updated_at: string
 }
 
-export type QuotationStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'rejected' | 'expired'
+export type QuotationStatus =
+  | 'draft'
+  | 'sent'
+  | 'viewed'
+  | 'under_discussion'
+  | 'revision_requested'
+  | 'approved'
+  | 'rejected'
+  | 'expired'
+  | 'accepted'
 
 export interface QuotationItem {
   description: string
@@ -230,21 +239,55 @@ export interface QuotationItem {
   total: number
 }
 
+export interface PaymentMilestone {
+  name: string
+  percentage: number
+  amount: number
+  due_trigger: string
+}
+
+export interface QuotationApprovalDetails {
+  approved_by: string
+  approver_email: string
+  approver_role?: string
+  approved_at: string
+  version: number
+  ip_address?: string
+  confirmation_statement?: string
+  notes?: string
+}
+
 export interface Quotation {
   id: string
   client_id: string
   requirement_id: string | null
+  parent_quotation_id?: string | null
+  version?: number
   quote_number: string
   title: string
+  description?: string | null
   items: QuotationItem[]
   subtotal: number
   discount: number
   tax_rate: number
   tax_amount: number
   total: number
+  advance_percentage?: number
+  advance_amount?: number
+  balance_amount?: number
+  payment_milestones?: PaymentMilestone[]
+  delivery_timeline?: string | null
+  terms_conditions?: string | null
   valid_until: string | null
   notes: string | null
   status: QuotationStatus
+  approval_details?: QuotationApprovalDetails | null
+  viewed_at?: string | null
+  view_count?: number
+  email_sent_to?: string | null
+  email_sent_at?: string | null
+  email_subject?: string | null
+  converted_project_id?: string | null
   sent_at: string | null
   accepted_at: string | null
   created_at: string
