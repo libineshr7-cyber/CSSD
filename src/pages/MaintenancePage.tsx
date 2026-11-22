@@ -32,6 +32,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatDate, formatCurrency } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { downloadMaintenanceReportPDF } from '../lib/pdfGenerator'
 import { sendMaintenanceRenewalReminderEmail } from '../lib/emailService'
 import type {
@@ -150,27 +151,27 @@ export default function MaintenancePage() {
   const fetchInitialData = async () => {
     setLoading(true)
     try {
-      const [recRes, planRes, cliRes, prjRes, webRes] = await Promise.all([
-        (supabase as any).from('maintenance_records').select('*').order('renewal_date', { ascending: true }),
-        (supabase as any).from('maintenance_plans').select('*').order('price', { ascending: true }),
-        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
-        (supabase as any).from('projects').select('*').order('name', { ascending: true }),
-        (supabase as any).from('monitored_websites').select('*')
+      const [recRes, planRes, clientList, prjRes, webRes] = await Promise.all([
+        (supabase as any).from('maintenance_records').select('*').order('renewal_date', { ascending: true }).catch(() => ({ data: [] })),
+        (supabase as any).from('maintenance_plans').select('*').order('price', { ascending: true }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('projects').select('*').order('name', { ascending: true }).catch(() => ({ data: [] })),
+        (supabase as any).from('monitored_websites').select('*').catch(() => ({ data: [] }))
       ])
 
-      if (recRes.data && recRes.data.length > 0) {
+      if (recRes?.data && recRes.data.length > 0) {
         setRecords(recRes.data)
       } else {
         setRecords([])
       }
 
-      if (planRes.data && planRes.data.length > 0) {
+      if (planRes?.data && planRes.data.length > 0) {
         setPlans(planRes.data)
       }
 
-      if (cliRes.data) setClients(cliRes.data)
-      if (prjRes.data) setProjects(prjRes.data)
-      if (webRes.data) setWebsites(webRes.data)
+      if (clientList) setClients(clientList)
+      if (prjRes?.data) setProjects(prjRes.data)
+      if (webRes?.data) setWebsites(webRes.data)
     } catch (err) {
       console.error('Error fetching maintenance data:', err)
       toast.error('Could not load all maintenance records.')

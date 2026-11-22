@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatDate, formatCurrency } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { useAuth } from '../contexts/AuthContext'
 import type {
   Project,
@@ -109,18 +110,18 @@ export default function ProjectsPage() {
     try {
       const [
         { data: pData },
-        { data: cData },
+        cList,
         { data: qData },
         { data: aData },
       ] = await Promise.all([
-        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
-        (supabase as any).from('quotations').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('agreements').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('quotations').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('agreements').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
       ])
 
       if (pData) setProjects(pData as Project[])
-      if (cData) setClients(cData as Client[])
+      if (cList) setClients(cList as Client[])
       if (qData) setQuotations(qData as Quotation[])
       if (aData) setAgreements(aData as Agreement[])
     } catch (err) {

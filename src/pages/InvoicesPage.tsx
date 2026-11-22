@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { downloadInvoicePDF } from '../lib/pdfGenerator'
 import { sendInvoiceEmail } from '../lib/emailService'
 import { useAuth } from '../contexts/AuthContext'
@@ -70,20 +71,20 @@ export default function InvoicesPage() {
     try {
       const [
         { data: invData, error: invErr },
-        { data: cData },
+        cList,
         { data: prData },
         { data: qData },
       ] = await Promise.all([
-        (supabase as any).from('invoices').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
-        (supabase as any).from('projects').select('*').order('name', { ascending: true }),
-        (supabase as any).from('quotations').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('invoices').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('projects').select('*').order('name', { ascending: true }).catch(() => ({ data: [] })),
+        (supabase as any).from('quotations').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
       ])
 
       if (!invErr && invData) {
         setInvoices(invData as Invoice[])
       }
-      if (cData) setClients(cData as Client[])
+      if (cList) setClients(cList as Client[])
       if (prData) setProjects(prData as Project[])
       if (qData) setQuotations(qData as Quotation[])
     } catch (err) {

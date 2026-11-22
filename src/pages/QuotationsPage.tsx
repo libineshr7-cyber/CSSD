@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { openPrintableQuotation, downloadQuotationPDF, downloadQuotationHTML } from '../lib/pdfGenerator'
 import { sendQuotationEmail } from '../lib/emailService'
 import type { Quotation, QuotationItem, QuotationStatus, Client, PaymentMilestone } from '../types/database'
@@ -66,8 +67,8 @@ export default function QuotationsPage() {
     } catch (_) {}
 
     try {
-      const { data: clientData } = await (supabase as any).from('clients').select('*')
-      if (clientData) setClients(clientData as Client[])
+      const clientData = await getClients()
+      if (clientData) setClients(clientData)
     } catch (_) {}
     setLoading(false)
   }

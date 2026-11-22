@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import {
   openPrintableAgreement,
   downloadAgreementPDF,
@@ -107,7 +108,7 @@ export default function AgreementsPage() {
           setAgreements(agrData)
         }
 
-        const { data: cData } = await (supabase as any).from('clients').select('*')
+        const cData = await getClients()
         if (cData) setClients(cData)
 
         const { data: qData } = await (supabase as any).from('quotations').select('*')

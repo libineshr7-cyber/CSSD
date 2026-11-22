@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatDate, formatCurrency } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { useAuth } from '../contexts/AuthContext'
 import { downloadHandoverDocumentPDF } from '../lib/pdfGenerator'
 import type {
@@ -53,12 +54,12 @@ export default function HandoverPage() {
     try {
       const [
         { data: pData },
-        { data: cData },
+        cList,
         { data: hData },
       ] = await Promise.all([
-        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('*'),
-        (supabase as any).from('project_handovers').select('*'),
+        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('project_handovers').select('*').catch(() => ({ data: [] })),
       ])
 
       if (pData) {
@@ -67,7 +68,7 @@ export default function HandoverPage() {
           setSelectedProjectId(pData[0].id)
         }
       }
-      if (cData) setClients(cData as Client[])
+      if (cList) setClients(cList as Client[])
 
       const handoverMap: Record<string, ProjectHandover> = {}
       if (hData) {

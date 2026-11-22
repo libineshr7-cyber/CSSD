@@ -11,6 +11,7 @@ import {
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { formatCurrency, formatDate, getInitials } from '../lib/utils'
 import type { Lead, Client, Project, Payment, Task, SupportTicket } from '../types/database'
 
@@ -115,22 +116,22 @@ export default function OverviewPage() {
       setLoading(true)
       const [
         { data: pData },
-        { data: cData },
+        cList,
         { data: lData },
         { data: payData },
         { data: tData },
         { data: tickData },
       ] = await Promise.all([
-        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('leads').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('payments').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('tasks').select('*').order('updated_at', { ascending: false }),
-        (supabase as any).from('support_tickets').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('leads').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('payments').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('tasks').select('*').order('updated_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('support_tickets').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
       ])
 
       if (pData) setProjects(pData)
-      if (cData) setClients(cData)
+      if (cList) setClients(cList)
       if (lData) setLeads(lData)
       if (payData) setPayments(payData)
       if (tData) setTasks(tData)

@@ -30,6 +30,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatDate } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import type {
   MonitoredWebsite,
   MonitoringLogItem,
@@ -79,20 +80,21 @@ export default function MonitoringPage() {
   const fetchMonitoringData = async () => {
     setLoading(true)
     try {
-      const [siteRes, alertRes, cliRes, prjRes] = await Promise.all([
-        (supabase as any).from('monitored_websites').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('system_alerts').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('id, name, business_name, company').order('name', { ascending: true }),
-        (supabase as any).from('projects').select('id, client_id, name').order('name', { ascending: true })
+      const [siteRes, alertRes, clientList, prjRes] = await Promise.all([
+        (supabase as any).from('monitored_websites').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('system_alerts').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('projects').select('id, client_id, name').order('name', { ascending: true }).catch(() => ({ data: [] }))
       ])
 
-      if (siteRes.data) setWebsites(siteRes.data)
-      if (alertRes.data) setAlerts(alertRes.data)
-      if (cliRes.data) setClients(cliRes.data)
-      if (prjRes.data) setProjects(prjRes.data)
+      if (siteRes?.data) setWebsites(siteRes.data)
+      if (alertRes?.data) setAlerts(alertRes.data)
+      if (clientList) setClients(clientList)
+      if (prjRes?.data) setProjects(prjRes.data)
     } catch (err) {
-      console.error('Error fetching monitoring data:', err)
-      toast.error('Could not load monitoring data.')
+      console.warn('Using local telemetry monitoring data:', err)
+      const fallbackClients = await getClients()
+      setClients(fallbackClients)
     } finally {
       setLoading(false)
     }

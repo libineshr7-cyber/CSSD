@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { downloadReceiptPDF } from '../lib/pdfGenerator'
 import { useAuth } from '../contexts/AuthContext'
 import type {
@@ -111,18 +112,18 @@ export default function PaymentsPage() {
     try {
       const [
         { data: payData },
-        { data: cData },
+        cList,
         { data: prData },
         { data: invData },
       ] = await Promise.all([
-        (supabase as any).from('payments').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
-        (supabase as any).from('projects').select('*').order('name', { ascending: true }),
-        (supabase as any).from('invoices').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('payments').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('projects').select('*').order('name', { ascending: true }).catch(() => ({ data: [] })),
+        (supabase as any).from('invoices').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
       ])
 
       if (payData) setPayments(payData as Payment[])
-      if (cData) setClients(cData as Client[])
+      if (cList) setClients(cList as Client[])
       if (prData) setProjects(prData as Project[])
       if (invData) setInvoices(invData as Invoice[])
     } catch (err) {

@@ -7,6 +7,7 @@ import {
   List, Check, Sparkles, Send, History, ArrowRight, Tag
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { formatDate } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
 import type {
@@ -88,18 +89,18 @@ export default function DesignApprovalsPage() {
         { data: aData },
         { data: rData },
         { data: pData },
-        { data: cData },
+        cList,
       ] = await Promise.all([
-        (supabase as any).from('design_approvals').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('project_revisions').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('projects').select('*').order('name', { ascending: true }),
-        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
+        (supabase as any).from('design_approvals').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('project_revisions').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('projects').select('*').order('name', { ascending: true }).catch(() => ({ data: [] })),
+        getClients(),
       ])
 
       if (aData) setApprovals(aData as DesignApproval[])
       if (rData) setRevisions(rData as ProjectRevision[])
       if (pData) setProjects(pData as Project[])
-      if (cData) setClients(cData as Client[])
+      if (cList) setClients(cList as Client[])
     } catch (_) {}
     setLoading(false)
   }

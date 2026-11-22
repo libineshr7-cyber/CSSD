@@ -13,6 +13,7 @@ import {
   Ban, ShieldAlert, ArrowDownRight, UserCheck
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { downloadFinancialReportPDF } from '../lib/pdfGenerator'
 import type { Invoice, Payment, Client, Project } from '../types/database'
@@ -61,20 +62,20 @@ export default function ReportsPage() {
       const [
         { data: invData },
         { data: payData },
-        { data: clientData },
+        cList,
         { data: projData },
         { data: logData },
       ] = await Promise.all([
-        (supabase as any).from('invoices').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('payments').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
-        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('financial_audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
+        (supabase as any).from('invoices').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('payments').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        (supabase as any).from('financial_audit_logs').select('*').order('created_at', { ascending: false }).limit(50).catch(() => ({ data: [] })),
       ])
 
       if (invData) setInvoices(invData as Invoice[])
       if (payData) setPayments(payData as Payment[])
-      if (clientData) setClients(clientData as Client[])
+      if (cList) setClients(cList as Client[])
       if (projData) setProjects(projData as Project[])
       if (logData) setAuditLogs(logData)
     } catch (err) {

@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import { openPrintableRequirementSummary, downloadRequirementPDF, downloadRequirementHTML } from '../lib/pdfGenerator'
 import type { Requirement, Client, Lead, RequirementReference, RequirementAttachment } from '../types/database'
 
@@ -90,8 +91,8 @@ export default function RequirementsPage() {
     } catch (_) {}
 
     try {
-      const { data: clientData } = await (supabase as any).from('clients').select('*')
-      if (clientData) setClients(clientData as Client[])
+      const clientData = await getClients()
+      if (clientData) setClients(clientData)
       const { data: leadData } = await (supabase as any).from('leads').select('*')
       if (leadData) setLeads(leadData as Lead[])
     } catch (_) {}

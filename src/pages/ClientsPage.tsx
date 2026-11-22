@@ -10,6 +10,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients, saveClient } from '../lib/clientStore'
 import { fetchClientFullHistory, type ClientFullHistory } from '../lib/clientHistory'
 import { openPrintableRequirementSummary } from '../lib/pdfGenerator'
 import type { Client, ClientStatus, PreferredComm } from '../types/database'
@@ -71,18 +72,12 @@ export default function ClientsPage() {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyTab, setHistoryTab] = useState<'overview' | 'requirements' | 'projects' | 'commercials' | 'documents'>('overview')
 
-  // Load clients from Supabase
+  // Load clients from Supabase & Resilient Cache
   const loadClients = async () => {
     setLoading(true)
     try {
-      const { data, error } = await (supabase as any)
-        .from('clients')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (!error && data) {
-        setClients(data as Client[])
-      }
+      const data = await getClients()
+      setClients(data)
     } catch (_) {}
     setLoading(false)
   }
@@ -191,38 +186,9 @@ export default function ClientsPage() {
           updated_at: new Date().toISOString(),
         }
 
-        try {
-          const { data } = await (supabase as any)
-            .from('clients')
-            .insert({
-              client_code: newClient.client_code,
-              name: newClient.name,
-              business_name: newClient.business_name,
-              company: newClient.company,
-              business_category: newClient.business_category,
-              email: newClient.email,
-              phone: newClient.phone,
-              address: newClient.address,
-              city: newClient.city,
-              state: newClient.state,
-              postal_code: newClient.postal_code,
-              country: newClient.country,
-              gstin: newClient.gstin,
-              preferred_comm: newClient.preferred_comm,
-              status: newClient.status,
-              notes: newClient.notes,
-            })
-            .select()
-            .single()
-
-          if (data) {
-            newClient.id = data.id
-            if (data.client_code) newClient.client_code = data.client_code
-          }
-        } catch (_) {}
-
-        setClients(prev => [newClient, ...prev])
-        toast.success(`Client created! ID: ${newClient.client_code}`)
+        const { data: savedClient } = await saveClient(newClient)
+        setClients(prev => [savedClient, ...prev.filter(c => c.id !== savedClient.id)])
+        toast.success(`Client created! ID: ${savedClient.client_code}`)
         setCreateModalOpen(false)
       }
     } catch (err: any) {

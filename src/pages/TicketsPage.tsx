@@ -6,6 +6,7 @@ import {
 import toast from 'react-hot-toast'
 import { formatDate } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { getClients } from '../lib/clientStore'
 import type { SupportTicket, TicketStatus, TicketPriority, Client, Project } from '../types/database'
 
 const STATUS_CONFIG: Record<TicketStatus, { label: string; badge: string }> = {
@@ -49,17 +50,17 @@ export default function TicketsPage() {
     try {
       const [
         { data: tData },
-        { data: cData },
+        cList,
         { data: prData },
       ] = await Promise.all([
-        (supabase as any).from('support_tickets').select('*').order('created_at', { ascending: false }),
-        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
-        (supabase as any).from('projects').select('*').order('name', { ascending: true }),
+        (supabase as any).from('support_tickets').select('*').order('created_at', { ascending: false }).catch(() => ({ data: [] })),
+        getClients(),
+        (supabase as any).from('projects').select('*').order('name', { ascending: true }).catch(() => ({ data: [] })),
       ])
       if (tData) setTickets(tData as SupportTicket[])
-      if (cData) {
-        setClients(cData as Client[])
-        if (cData.length > 0 && !clientId) setClientId(cData[0].id)
+      if (cList) {
+        setClients(cList as Client[])
+        if (cList.length > 0 && !clientId) setClientId(cList[0].id)
       }
       if (prData) setProjects(prData as Project[])
     } catch (_) {}
