@@ -356,3 +356,90 @@ export async function sendTestEmail(toEmail: string): Promise<SendEmailResponse>
     tags: ['test-email'],
   })
 }
+
+/**
+ * Send Maintenance Subscription Renewal Reminder Email
+ */
+export async function sendMaintenanceRenewalReminderEmail(params: {
+  toEmail: string
+  clientName: string
+  planName: string
+  price: number
+  renewalDate: string
+  daysLeft: number
+  websiteUrl?: string
+}): Promise<SendEmailResponse> {
+  const { toEmail, clientName, planName, price, renewalDate, daysLeft, websiteUrl } = params
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+    .card { max-width: 600px; margin: 0 auto; background: #1e293b; border: 1px solid #334155; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .header { background: #0f172a; padding: 28px; border-bottom: 1px solid #334155; text-align: center; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; background: rgba(13,153,255,0.15); color: #0d99ff; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
+    .body { padding: 28px; font-size: 14px; line-height: 1.6; color: #cbd5e1; }
+    .highlight-box { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 18px; margin: 20px 0; }
+    .btn { display: inline-block; padding: 12px 28px; background: #0d99ff; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; }
+    .footer { padding: 20px 28px; background: #0f172a; border-top: 1px solid #334155; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="badge">CapeSecure Maintenance Desk</div>
+      <h1 style="margin: 0; color: #ffffff; font-size: 22px;">Website Maintenance Renewal Notice</h1>
+    </div>
+    <div class="body">
+      <p>Dear ${clientName},</p>
+      <p>This is a formal reminder regarding your upcoming website maintenance and security coverage. Your active plan <strong>${planName}</strong> is scheduled for renewal in <strong>${daysLeft} days</strong> (Renewal Date: <strong>${formatDate(renewalDate)}</strong>).</p>
+      
+      <div class="highlight-box">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0;">Subscription Plan:</td>
+            <td style="color: #ffffff; font-weight: 600; text-align: right;">${planName}</td>
+          </tr>
+          ${websiteUrl ? `
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0;">Covered Domain:</td>
+            <td style="color: #0d99ff; font-weight: 600; text-align: right;">${websiteUrl}</td>
+          </tr>` : ''}
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0;">Annual Investment:</td>
+            <td style="color: #0acf83; font-weight: 700; text-align: right;">${formatCurrency(price)}</td>
+          </tr>
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0;">SLA Protection:</td>
+            <td style="color: #ffffff; text-align: right;">99.5%+ Uptime & Defect Warranty</td>
+          </tr>
+        </table>
+      </div>
+
+      <p>Maintaining an active subscription guarantees uninterrupted weekly security patches, off-site encrypted backup verification, TLS/SSL auto-renewal, and immediate priority support response.</p>
+      
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="https://capesecure.vercel.app/portal" class="btn">View & Renew Subscription in Client Portal</a>
+      </div>
+
+      <p style="font-size: 12px; color: #94a3b8;">Note: As per CapeSecure compliance policy, no automatic card charges will occur without an authorized mandate.</p>
+    </div>
+    <div class="footer">
+      CapeSecure Solutions LLP • Enterprise Infrastructure & Security Management<br>
+      For billing inquiries: billing@capesecure.com
+    </div>
+  </div>
+</body>
+</html>`
+
+  return sendBrevoEmail({
+    to: toEmail,
+    toName: clientName,
+    subject: `Urgent: Maintenance Renewal Reminder for ${clientName} (${daysLeft} Days Remaining)`,
+    htmlContent: html,
+    tags: ['maintenance', 'renewal-reminder'],
+  })
+}
+

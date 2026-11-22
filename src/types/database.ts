@@ -892,3 +892,116 @@ export const ROLE_LABELS: Record<AppRole, { label: string; badge: string; descri
   },
 }
 
+// ─── Phase 10: Maintenance and Website Health Monitoring Types ────────────────
+
+export type MaintenanceBillingFrequency = 'yearly' | 'semi_annual' | 'quarterly' | 'monthly'
+export type MaintenancePaymentStatus = 'paid' | 'pending' | 'overdue' | 'cancelled'
+export type MaintenanceContractStatus = 'active' | 'pending_renewal' | 'expired' | 'suspended'
+
+export interface MaintenancePlanConfig {
+  id: string
+  name: string
+  price: number
+  billing_frequency: MaintenanceBillingFrequency
+  inclusions: string[]
+  exclusions: string[]
+  support_hours_per_month: number
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MaintenanceActivityItem {
+  id: string
+  activity: string
+  performed_by: string
+  date: string
+  notes?: string
+  status?: 'completed' | 'in_progress' | 'scheduled'
+}
+
+export interface SupportEntitlement {
+  hours_per_month: number
+  hours_used: number
+  priority_sla: string
+  included_tickets?: number
+}
+
+export interface MaintenanceRecord {
+  id: string
+  client_id: string
+  project_id?: string | null
+  plan_id: string
+  plan_name: string
+  price: number
+  billing_frequency: MaintenanceBillingFrequency | string
+  start_date: string
+  renewal_date: string
+  payment_status: MaintenancePaymentStatus
+  contract_status: MaintenanceContractStatus
+  support_entitlement?: SupportEntitlement
+  maintenance_history?: MaintenanceActivityItem[]
+  notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type WebsiteUptimeStatus = 'up' | 'degraded' | 'down'
+export type WebsiteSSLStatus = 'valid' | 'expiring_soon' | 'expired' | 'invalid'
+export type BackupStatus = 'success' | 'failed' | 'pending' | 'unverified'
+
+export interface MonitoredWebsite {
+  id: string
+  client_id: string
+  project_id?: string | null
+  name: string
+  url: string
+  status: WebsiteUptimeStatus
+  http_status: number
+  response_time_ms: number
+  uptime_percentage: number
+  ssl_status: WebsiteSSLStatus
+  ssl_valid_to?: string | null
+  ssl_days_remaining: number
+  ssl_issuer?: string | null
+  domain_expiry_date?: string | null
+  domain_source_verified: boolean
+  domain_registrar?: string | null
+  scheduled_backup_status: BackupStatus
+  backup_source_verified: boolean
+  last_backup_at?: string | null
+  hosting_availability: string
+  monitoring_interval_mins: number
+  last_checked_at: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MonitoringLogItem {
+  id: string
+  website_id: string
+  http_status: number
+  response_time_ms: number
+  status: WebsiteUptimeStatus
+  details?: string | null
+  created_at: string
+}
+
+export type AlertType = 'downtime' | 'ssl_expiry' | 'domain_expiry' | 'renewal_approaching' | 'backup_failed' | 'server_error'
+export type AlertSeverity = 'info' | 'warning' | 'critical'
+
+export interface SystemAlert {
+  id: string
+  alert_type: AlertType
+  severity: AlertSeverity
+  title: string
+  message: string
+  client_id?: string | null
+  website_id?: string | null
+  maintenance_record_id?: string | null
+  is_resolved: boolean
+  resolved_at?: string | null
+  created_at: string
+}
+
+

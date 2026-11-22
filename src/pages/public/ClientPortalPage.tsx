@@ -15,7 +15,8 @@ import {
   downloadAgreementPDF,
   downloadInvoicePDF,
   downloadReceiptPDF,
-  downloadHandoverDocumentPDF
+  downloadHandoverDocumentPDF,
+  downloadMaintenanceReportPDF
 } from '../../lib/pdfGenerator'
 import type {
   Client,
@@ -28,7 +29,9 @@ import type {
   DesignApproval,
   ProjectHandover,
   SupportTicket,
-  Document
+  Document,
+  MaintenanceRecord,
+  MonitoredWebsite
 } from '../../types/database'
 
 type PortalTab =
@@ -87,6 +90,8 @@ export default function ClientPortalPage() {
   const [clientHandovers, setClientHandovers] = useState<ProjectHandover[]>([])
   const [clientTickets, setClientTickets] = useState<SupportTicket[]>([])
   const [clientDocuments, setClientDocuments] = useState<Document[]>([])
+  const [clientMaintenance, setClientMaintenance] = useState<MaintenanceRecord[]>([])
+  const [clientWebsites, setClientWebsites] = useState<MonitoredWebsite[]>([])
 
   // Modal / Interaction states
   const [selectedDesign, setSelectedDesign] = useState<DesignApproval | null>(null)
@@ -276,7 +281,7 @@ export default function ClientPortalPage() {
     setLoadingData(true)
     try {
       const [
-        pRes, qRes, aRes, iRes, payRes, dRes, hRes, tRes, docRes
+        pRes, qRes, aRes, iRes, payRes, dRes, hRes, tRes, docRes, mRes, wRes
       ] = await Promise.all([
         (supabase as any).from('projects').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         (supabase as any).from('quotations').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
@@ -286,7 +291,9 @@ export default function ClientPortalPage() {
         (supabase as any).from('design_approvals').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         (supabase as any).from('project_handovers').select('*').order('created_at', { ascending: false }),
         (supabase as any).from('support_tickets').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        (supabase as any).from('documents').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
+        (supabase as any).from('documents').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        (supabase as any).from('maintenance_records').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        (supabase as any).from('monitored_websites').select('*').eq('client_id', clientId)
       ])
 
       if (pRes.data) setClientProjects(pRes.data)
@@ -297,6 +304,8 @@ export default function ClientPortalPage() {
       if (dRes.data) setClientDesigns(dRes.data)
       if (tRes.data) setClientTickets(tRes.data)
       if (docRes.data) setClientDocuments(docRes.data)
+      if (mRes.data) setClientMaintenance(mRes.data)
+      if (wRes.data) setClientWebsites(wRes.data)
 
       if (hRes.data && pRes.data) {
         const projectIds = new Set((pRes.data as Project[]).map(p => p.id))
@@ -1292,21 +1301,69 @@ export default function ClientPortalPage() {
               </div>
             </div>
 
-            {/* SLA Card */}
-            <div className="bg-[#202020] border border-[#333333] rounded-2xl p-5 shadow-md flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#0ACF83]/15 text-[#0ACF83] border border-[#0ACF83]/30 flex items-center justify-center">
-                  <Shield className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white">CapeSecure Warranty & Active SLA</h4>
-                  <p className="text-xs text-slate-400">90-Day post-deployment zero-defect warranty active. Priority response under 2 hours.</p>
-                </div>
+            {/* SLA & Active Maintenance Card */}
+            {clientMaintenance.length > 0 ? (
+              <div className="space-y-4">
+                {clientMaintenance.map((m) => {
+                  const mWebsite = clientWebsites[0] || null
+                  return (
+                    <div
+                      key={m.id}
+                      className="bg-[#202020] border border-[#333333] rounded-2xl p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-bold text-[#0ACF83]">{m.plan_name}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase ${
+                            m.contract_status === 'active'
+                              ? 'bg-[#0ACF83]/15 text-[#0ACF83] border border-[#0ACF83]/30'
+                              : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {m.contract_status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300">
+                          Next Renewal Date: <span className="font-bold text-white">{formatDate(m.renewal_date)}</span> • Rate: {formatCurrency(m.price)} / {m.billing_frequency}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Support Entitlement: {m.support_entitlement?.priority_sla || 'High Priority (2hr SLA)'} • {m.support_entitlement?.hours_used || 0}h / {m.support_entitlement?.hours_per_month || 2}h used
+                        </p>
+                        {mWebsite && (
+                          <p className="text-[11px] text-[#0D99FF]">
+                            Covered Site: {mWebsite.url} • Uptime SLA: {mWebsite.uptime_percentage}%
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => downloadMaintenanceReportPDF(m, sessionClient, mWebsite)}
+                          className="px-4 py-2 rounded-xl bg-[#0ACF83] hover:bg-[#08a569] text-white text-xs font-semibold shadow transition-all inline-flex items-center gap-2"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download Maintenance Health Report PDF</span>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <span className="text-xs font-semibold text-[#0ACF83] px-3 py-1 rounded-full bg-[#0ACF83]/10 border border-[#0ACF83]/20">
-                Active
-              </span>
-            </div>
+            ) : (
+              <div className="bg-[#202020] border border-[#333333] rounded-2xl p-5 shadow-md flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#0ACF83]/15 text-[#0ACF83] border border-[#0ACF83]/30 flex items-center justify-center">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">CapeSecure Warranty & Active SLA</h4>
+                    <p className="text-xs text-slate-400">90-Day post-deployment zero-defect warranty active. Priority response under 2 hours.</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-[#0ACF83] px-3 py-1 rounded-full bg-[#0ACF83]/10 border border-[#0ACF83]/20">
+                  Active Warranty
+                </span>
+              </div>
+            )}
 
             {/* Raise Support Ticket Form */}
             <div className="bg-[#202020] border border-[#333333] rounded-2xl p-6 shadow-md">
