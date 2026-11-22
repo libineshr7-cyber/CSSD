@@ -5,11 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency = 'ZAR'): string {
-  return new Intl.NumberFormat('en-ZA', {
+export function formatCurrency(amount: number, currency = 'INR'): string {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
-    minimumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(amount)
 }
 
@@ -19,10 +19,10 @@ export function formatDate(date: string | Date | null, format = 'short'): string
   if (isNaN(d.getTime())) return '—'
 
   if (format === 'short') {
-    return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
   }
   if (format === 'long') {
-    return d.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   }
   if (format === 'relative') {
     const now = new Date()
@@ -35,14 +35,14 @@ export function formatDate(date: string | Date | null, format = 'short'): string
     if (days < 365) return `${Math.floor(days / 30)} months ago`
     return `${Math.floor(days / 365)} years ago`
   }
-  return d.toLocaleDateString('en-ZA')
+  return d.toLocaleDateString('en-IN')
 }
 
 export function formatDateTime(date: string | Date | null): string {
   if (!date) return '—'
   const d = typeof date === 'string' ? new Date(date) : date
   if (isNaN(d.getTime())) return '—'
-  return d.toLocaleString('en-ZA', {
+  return d.toLocaleString('en-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',

@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import {
   Plus, X, Paintbrush, Eye, CheckCircle, RotateCcw, ChevronDown,
   Calendar, User, MessageSquare, FileImage, Clock
 } from 'lucide-react'
-import { demoProjects } from '../data/demoData'
+import { supabase } from '../lib/supabase'
+import type { Project } from '../types/database'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,40 +25,9 @@ interface DesignApproval {
   fileUrl?: string
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Real Baseline ────────────────────────────────────────────────────────────
 
-const INITIAL_APPROVALS: DesignApproval[] = [
-  {
-    id: 'da-001', projectId: 'proj-001', projectName: 'Apex Financial Dashboard',
-    clientName: 'David Chen', stage: 'Wireframe', submittedDate: '2026-11-05T09:00:00Z',
-    reviewer: 'Sarah K.', comments: 'Layout looks good. Navigation needs to be clearer.',
-    status: 'approved',
-  },
-  {
-    id: 'da-002', projectId: 'proj-001', projectName: 'Apex Financial Dashboard',
-    clientName: 'David Chen', stage: 'Mockup', submittedDate: '2026-11-14T10:30:00Z',
-    reviewer: 'Sarah K.', comments: 'Colours need to be darker for the sidebar.',
-    status: 'revision_requested',
-  },
-  {
-    id: 'da-003', projectId: 'proj-002', projectName: 'StyleHaus E-Commerce',
-    clientName: 'Amanda Steyn', stage: 'Wireframe', submittedDate: '2026-11-10T08:00:00Z',
-    reviewer: 'Mark D.', comments: 'Awaiting client review.',
-    status: 'pending',
-  },
-  {
-    id: 'da-004', projectId: 'proj-002', projectName: 'StyleHaus E-Commerce',
-    clientName: 'Amanda Steyn', stage: 'Mockup', submittedDate: '2026-11-18T11:00:00Z',
-    reviewer: 'Mark D.', comments: 'Product card design needs more spacing.',
-    status: 'pending',
-  },
-  {
-    id: 'da-005', projectId: 'proj-003', projectName: 'Horizon Health Portal',
-    clientName: 'Nomvula Dlamini', stage: 'Prototype', submittedDate: '2026-11-20T14:00:00Z',
-    reviewer: 'Priya N.', comments: 'All interactions approved. Ready for final design.',
-    status: 'approved',
-  },
-]
+const INITIAL_APPROVALS: DesignApproval[] = []
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -191,6 +161,7 @@ function ApprovalCard({
 
 export default function DesignApprovalsPage() {
   const [approvals, setApprovals] = useState<DesignApproval[]>(INITIAL_APPROVALS)
+  const [projects, setProjects] = useState<Project[]>([])
   const [activeTab, setActiveTab] = useState<TabKey>('pending')
   const [showModal, setShowModal] = useState(false)
 
@@ -201,6 +172,16 @@ export default function DesignApprovalsPage() {
     reviewer: '',
     comments: '',
   })
+
+  useEffect(() => {
+    async function loadProjects() {
+      try {
+        const { data } = await (supabase as any).from('projects').select('*').order('name', { ascending: true })
+        if (data) setProjects(data as Project[])
+      } catch (_) {}
+    }
+    loadProjects()
+  }, [])
 
   const filtered = approvals.filter(a => activeTab === 'all' || a.status === activeTab)
 
@@ -220,7 +201,7 @@ export default function DesignApprovalsPage() {
       toast.error('Please select a project and design stage.')
       return
     }
-    const project = demoProjects.find(p => p.id === form.projectId)
+    const project = projects.find(p => p.id === form.projectId)
     const newApproval: DesignApproval = {
       id: `da-${Date.now()}`,
       projectId: form.projectId,
@@ -318,7 +299,7 @@ export default function DesignApprovalsPage() {
                     required
                   >
                     <option value="">Select project…</option>
-                    {demoProjects.map(p => (
+                    {projects.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>

@@ -23,82 +23,17 @@ interface MonitoredSite {
 const INITIAL_SITES: MonitoredSite[] = [
   {
     id: 'mon-01',
-    name: 'CapeSecure Main Portal',
+    name: 'CapeSecure Main Cloud Platform',
     url: 'https://capesecure.vercel.app',
-    clientName: 'CapeSecure Internal',
-    status: 'up',
-    uptime: 99.98,
-    responseTime: 98,
-    sslValid: true,
-    sslDaysRemaining: 76,
-    lastChecked: '2 mins ago',
-    uptimeHistory: [true, true, true, true, true, true, true, true, true, true, true, true]
-  },
-  {
-    id: 'mon-02',
-    name: 'Apex Financial Platform',
-    url: 'https://apexfin.co.za',
-    clientName: 'Apex Financial',
-    status: 'up',
-    uptime: 99.95,
-    responseTime: 142,
-    sslValid: true,
-    sslDaysRemaining: 120,
-    lastChecked: '1 min ago',
-    uptimeHistory: [true, true, true, true, true, true, true, true, true, true, true, true]
-  },
-  {
-    id: 'mon-03',
-    name: 'StyleHaus Fashion Boutique',
-    url: 'https://stylehaus.co.za',
-    clientName: 'StyleHaus Fashion',
-    status: 'up',
-    uptime: 99.82,
-    responseTime: 210,
-    sslValid: true,
-    sslDaysRemaining: 45,
-    lastChecked: '3 mins ago',
-    uptimeHistory: [true, true, true, true, true, false, true, true, true, true, true, true]
-  },
-  {
-    id: 'mon-04',
-    name: 'Horizon Health Patient Clinic',
-    url: 'https://horizonhealth.co.za',
-    clientName: 'Horizon Health',
+    clientName: 'CapeSecure Solutions',
     status: 'up',
     uptime: 99.99,
-    responseTime: 115,
+    responseTime: 82,
     sslValid: true,
     sslDaysRemaining: 90,
     lastChecked: 'Just now',
     uptimeHistory: [true, true, true, true, true, true, true, true, true, true, true, true]
   },
-  {
-    id: 'mon-05',
-    name: 'Cape Craft Brews Online Shop',
-    url: 'https://craftbrews.co.za',
-    clientName: 'Cape Craft Brews',
-    status: 'degraded',
-    uptime: 97.40,
-    responseTime: 890,
-    sslValid: true,
-    sslDaysRemaining: 14,
-    lastChecked: '5 mins ago',
-    uptimeHistory: [true, true, false, true, true, true, false, true, true, true, true, false]
-  },
-  {
-    id: 'mon-06',
-    name: 'Pinnacle Properties Staging',
-    url: 'https://staging.pinnacleprops.co.za',
-    clientName: 'Pinnacle Properties',
-    status: 'down',
-    uptime: 94.20,
-    responseTime: 0,
-    sslValid: false,
-    sslDaysRemaining: 0,
-    lastChecked: 'Just now',
-    uptimeHistory: [true, true, true, false, false, false, false, false, false, false, false, false]
-  }
 ]
 
 export default function MonitoringPage() {
@@ -349,7 +284,7 @@ export default function MonitoringPage() {
                 <input
                   type="url"
                   required
-                  placeholder="https://example.co.za"
+                  placeholder="https://example.com"
                   value={newUrl}
                   onChange={e => setNewUrl(e.target.value)}
                   className="input font-mono text-xs"

@@ -1,4 +1,4 @@
-import type { Requirement, Client, Lead, Quotation, Agreement } from '../types/database'
+import type { Requirement, Client, Lead, Quotation, Agreement, Invoice, Payment, Project } from '../types/database'
 import { formatCurrency, formatDate } from './utils'
 import { PDFBuilder } from './pdfBuilder'
 
@@ -1717,5 +1717,232 @@ export function downloadAgreementPDF(agreement: Agreement, client?: Client | nul
 
   pdf.download(`CapeSecure-Agreement-${agrSafe}.pdf`)
 }
+
+/**
+ * Downloads a genuine binary .pdf file for the Tax Invoice
+ */
+export function downloadInvoicePDF(invoice: Invoice, client?: Client | null, project?: Project | null) {
+  const pdf = new PDFBuilder()
+  const invNumber = invoice.invoice_number || 'INV-2026-001'
+  const invSafe = invNumber.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const clientName = client?.name || 'Valued Client'
+  const companyName = client?.business_name || client?.company || clientName
+  const clientEmail = client?.email || 'N/A'
+  const clientPhone = client?.phone || 'N/A'
+  const clientAddress = client?.address || 'Kerala, India'
+  const gstin = client?.gstin || 'Unregistered / Exempt'
+
+  // Header Bar
+  pdf.fillRect(36, 36, 523, 72, 0.06, 0.09, 0.16)
+  pdf.drawText('CAPE', 50, 52, { fontSize: 20, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('SECURE', 105, 52, { fontSize: 20, bold: true, r: 0.05, g: 0.6, b: 1 })
+  pdf.drawText('ENTERPRISE WEB ENGINEERING & CLOUD SECURITY', 50, 74, { fontSize: 7, bold: true, r: 0.6, g: 0.7, b: 0.85 })
+  pdf.drawText('CapeSecure HQ, Kerala, India | contact@capesecure.com | https://capesecure.vercel.app', 50, 84, { fontSize: 7, r: 0.5, g: 0.6, b: 0.75 })
+
+  // Tax Invoice Badge on top right
+  pdf.fillRect(400, 48, 145, 48, 0.1, 0.15, 0.25)
+  pdf.drawText('TAX INVOICE', 472, 58, { fontSize: 13, bold: true, align: 'center', r: 1, g: 1, b: 1 })
+  pdf.drawText(`INV: ${invNumber}`, 472, 73, { fontSize: 8, bold: true, align: 'center', r: 0.2, g: 0.75, b: 1 })
+  pdf.drawText(`DATE: ${formatDate(invoice.created_at || new Date().toISOString())}`, 472, 84, { fontSize: 7, align: 'center', r: 0.7, g: 0.8, b: 0.9 })
+
+  // Meta Section: Billed By vs Billed To
+  let curY = 120
+  pdf.fillRect(36, curY, 255, 96, 0.97, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 255, 96, 0.85, 0.88, 0.92, 1)
+  pdf.drawText('ISSUED BY', 46, curY + 8, { fontSize: 8, bold: true, r: 0.2, g: 0.35, b: 0.6 })
+  pdf.drawText('CapeSecure Solutions LLP', 46, curY + 22, { fontSize: 9, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+  pdf.drawText('Kerala Technology Corridor, India', 46, curY + 34, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText('Email: billing@capesecure.com', 46, curY + 46, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText('Phone: +91 94892 23812', 46, curY + 58, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText('GSTIN: 32AABCC8921M1Z5 | PAN: AABCC8921M', 46, curY + 70, { fontSize: 7, bold: true, r: 0.2, g: 0.4, b: 0.55 })
+  pdf.drawText('Website: https://capesecure.vercel.app', 46, curY + 82, { fontSize: 7, r: 0.4, g: 0.45, b: 0.5 })
+
+  pdf.fillRect(304, curY, 255, 96, 0.97, 0.98, 0.99)
+  pdf.strokeRect(304, curY, 255, 96, 0.85, 0.88, 0.92, 1)
+  pdf.drawText('BILLED TO (CLIENT)', 314, curY + 8, { fontSize: 8, bold: true, r: 0.2, g: 0.35, b: 0.6 })
+  pdf.drawText(companyName.substring(0, 32), 314, curY + 22, { fontSize: 9, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+  pdf.drawText(`Attn: ${clientName}`, 314, curY + 34, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`Email: ${clientEmail}`, 314, curY + 46, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`Phone: ${clientPhone}`, 314, curY + 58, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`Address: ${clientAddress.substring(0, 40)}`, 314, curY + 70, { fontSize: 7, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`GSTIN: ${gstin}`, 314, curY + 82, { fontSize: 7, bold: true, r: 0.2, g: 0.4, b: 0.55 })
+
+  // Status & Due Date Bar
+  curY = 226
+  pdf.fillRect(36, curY, 523, 30, 0.94, 0.96, 0.98)
+  pdf.strokeRect(36, curY, 523, 30, 0.8, 0.85, 0.9, 1)
+
+  const isPaid = invoice.status === 'paid'
+  const isOverdue = invoice.status === 'overdue'
+
+  if (isPaid) {
+    pdf.fillRect(44, curY + 5, 80, 20, 0.1, 0.65, 0.3)
+    pdf.drawText('PAID FULL', 84, curY + 11, { fontSize: 8, bold: true, align: 'center', r: 1, g: 1, b: 1 })
+  } else if (isOverdue) {
+    pdf.fillRect(44, curY + 5, 80, 20, 0.8, 0.2, 0.2)
+    pdf.drawText('OVERDUE', 84, curY + 11, { fontSize: 8, bold: true, align: 'center', r: 1, g: 1, b: 1 })
+  } else {
+    pdf.fillRect(44, curY + 5, 80, 20, 0.1, 0.45, 0.85)
+    pdf.drawText(invoice.status.toUpperCase(), 84, curY + 11, { fontSize: 8, bold: true, align: 'center', r: 1, g: 1, b: 1 })
+  }
+
+  pdf.drawText(`Due Date: ${formatDate(invoice.due_date || new Date().toISOString())}`, 140, curY + 11, { fontSize: 8, bold: true, r: 0.15, g: 0.2, b: 0.3 })
+  if (project?.name) {
+    pdf.drawText(`Project: ${project.name.substring(0, 30)}`, 320, curY + 11, { fontSize: 8, r: 0.25, g: 0.3, b: 0.4 })
+  }
+  pdf.drawText(`Currency: INR (Rs.)`, 545, curY + 11, { fontSize: 8, bold: true, align: 'right', r: 0.15, g: 0.2, b: 0.3 })
+
+  // Line Items Table Header
+  curY = 268
+  pdf.fillRect(36, curY, 523, 20, 0.1, 0.15, 0.25)
+  pdf.drawText('#', 44, curY + 6, { fontSize: 7.5, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('DESCRIPTION / SERVICE DELIVERABLE', 68, curY + 6, { fontSize: 7.5, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('QTY', 370, curY + 6, { fontSize: 7.5, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('UNIT PRICE (Rs.)', 440, curY + 6, { fontSize: 7.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
+  pdf.drawText('AMOUNT (Rs.)', 545, curY + 6, { fontSize: 7.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
+
+  curY += 20
+  const items = (invoice.items && invoice.items.length > 0) ? invoice.items : [
+    { description: 'Professional Web Application Development & Deployment', quantity: 1, unit_price: invoice.total, total: invoice.total }
+  ]
+
+  items.forEach((item, index) => {
+    const bgR = index % 2 === 0 ? 0.99 : 0.96
+    const bgG = index % 2 === 0 ? 0.99 : 0.97
+    const bgB = index % 2 === 0 ? 1.0 : 0.98
+    pdf.fillRect(36, curY, 523, 22, bgR, bgG, bgB)
+    pdf.strokeRect(36, curY, 523, 22, 0.9, 0.92, 0.95, 0.5)
+
+    pdf.drawText(String(index + 1), 44, curY + 7, { fontSize: 7.5, r: 0.4, g: 0.45, b: 0.5 })
+    pdf.drawText(item.description.substring(0, 52), 68, curY + 7, { fontSize: 7.5, bold: true, r: 0.15, g: 0.2, b: 0.25 })
+    pdf.drawText(String(item.quantity), 375, curY + 7, { fontSize: 7.5, r: 0.2, g: 0.25, b: 0.3 })
+    pdf.drawText(`Rs. ${item.unit_price.toLocaleString('en-IN')}`, 440, curY + 7, { fontSize: 7.5, align: 'right', r: 0.2, g: 0.25, b: 0.3 })
+    pdf.drawText(`Rs. ${item.total.toLocaleString('en-IN')}`, 545, curY + 7, { fontSize: 7.5, bold: true, align: 'right', r: 0.1, g: 0.15, b: 0.2 })
+
+    curY += 22
+  })
+
+  // Calculation Breakdown
+  curY += 12
+  const calcBoxX = 330
+  const calcBoxW = 229
+
+  pdf.fillRect(calcBoxX, curY, calcBoxW, 110, 0.97, 0.98, 0.99)
+  pdf.strokeRect(calcBoxX, curY, calcBoxW, 110, 0.85, 0.88, 0.92, 1)
+
+  pdf.drawText('Subtotal:', calcBoxX + 10, curY + 12, { fontSize: 8, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`Rs. ${invoice.subtotal.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 12, { fontSize: 8, bold: true, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
+
+  if (invoice.discount && invoice.discount > 0) {
+    pdf.drawText('Discount Applied:', calcBoxX + 10, curY + 28, { fontSize: 8, r: 0.2, g: 0.55, b: 0.3 })
+    pdf.drawText(`- Rs. ${invoice.discount.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 28, { fontSize: 8, bold: true, align: 'right', r: 0.2, g: 0.55, b: 0.3 })
+  }
+
+  const taxLabel = `GST (${invoice.tax_rate || 18}%):`
+  pdf.drawText(taxLabel, calcBoxX + 10, curY + 44, { fontSize: 8, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`Rs. ${(invoice.tax_amount || 0).toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 44, { fontSize: 8, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
+
+  pdf.line(calcBoxX + 8, curY + 58, calcBoxX + calcBoxW - 8, curY + 58, 0.75, 0.8, 0.88, 1)
+
+  // Grand Total Highlight
+  pdf.fillRect(calcBoxX + 4, curY + 62, calcBoxW - 8, 22, 0.08, 0.12, 0.2)
+  pdf.drawText('TOTAL PAYABLE:', calcBoxX + 10, curY + 69, { fontSize: 8.5, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText(`Rs. ${invoice.total.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 69, { fontSize: 10, bold: true, align: 'right', r: 0.1, g: 0.8, b: 0.4 })
+
+  if (isPaid) {
+    pdf.drawText('Paid in Full (Zero Balance)', calcBoxX + calcBoxW / 2, curY + 95, { fontSize: 7.5, bold: true, align: 'center', r: 0.1, g: 0.6, b: 0.25 })
+  } else {
+    pdf.drawText('Payment Due Upon Presentation', calcBoxX + calcBoxW / 2, curY + 95, { fontSize: 7.5, align: 'center', r: 0.5, g: 0.4, b: 0.1 })
+  }
+
+  // Banking & Payment Details (Left Box)
+  pdf.fillRect(36, curY, 280, 110, 0.97, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 280, 110, 0.85, 0.88, 0.92, 1)
+  pdf.drawText('BANK & PAYMENT SETTLEMENT DETAILS', 46, curY + 10, { fontSize: 8, bold: true, r: 0.1, g: 0.35, b: 0.65 })
+  pdf.drawText('Beneficiary Name: CapeSecure Solutions LLP', 46, curY + 26, { fontSize: 7.5, bold: true, r: 0.15, g: 0.2, b: 0.25 })
+  pdf.drawText('Bank: State Bank of India / HDFC Bank', 46, curY + 38, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText('Account Number: 418299100234', 46, curY + 50, { fontSize: 7.5, bold: true, r: 0.15, g: 0.2, b: 0.25 })
+  pdf.drawText('IFSC Code: SBIN0001234', 46, curY + 62, { fontSize: 7.5, bold: true, r: 0.15, g: 0.2, b: 0.25 })
+  pdf.drawText('UPI ID: capesecure@upi', 46, curY + 74, { fontSize: 7.5, bold: true, r: 0.05, g: 0.5, b: 0.8 })
+  pdf.drawText('Please quote invoice number as transaction reference.', 46, curY + 90, { fontSize: 6.8, r: 0.45, g: 0.5, b: 0.55 })
+
+  // Notes & Legal Notice
+  curY += 125
+  pdf.fillRect(36, curY, 523, 56, 0.98, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 523, 56, 0.88, 0.9, 0.93, 1)
+  pdf.drawText('TERMS & PAYMENT CONDITIONS', 44, curY + 8, { fontSize: 7.5, bold: true, r: 0.25, g: 0.3, b: 0.4 })
+  pdf.drawText('1. Payment is strictly required within terms. Overdue accounts subject to 1.5% monthly service charge.', 44, curY + 20, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
+  pdf.drawText('2. All intellectual property in delivered web assets transfers to client upon receipt of full settlement.', 44, curY + 31, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
+  pdf.drawText('3. This is an electronically generated and authenticated Tax Invoice valid under Indian IT Act 2000.', 44, curY + 42, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
+
+  // Authorization Signatures
+  curY += 70
+  pdf.line(360, curY + 36, 540, curY + 36, 0.6, 0.65, 0.7, 1)
+  pdf.drawText('Authorized Signatory for CapeSecure Solutions', 450, curY + 44, { fontSize: 7, bold: true, align: 'center', r: 0.2, g: 0.25, b: 0.3 })
+  pdf.drawText('Computer Generated • No Physical Signature Required', 450, curY + 54, { fontSize: 6.5, align: 'center', r: 0.5, g: 0.55, b: 0.6 })
+
+  // Footer
+  pdf.line(36, 785, 559, 785, 0.85, 0.88, 0.92, 1)
+  pdf.drawText(`CapeSecure Tax Invoice • Ref: ${invNumber} • https://capesecure.vercel.app`, 36, 795, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText('Thank you for your business!', 559, 795, { fontSize: 7.5, bold: true, align: 'right', r: 0.2, g: 0.5, b: 0.8 })
+
+  pdf.download(`CapeSecure-Invoice-${invSafe}.pdf`)
+}
+
+/**
+ * Downloads a genuine binary .pdf file for a Payment Receipt
+ */
+export function downloadReceiptPDF(payment: Payment, client?: Client | null, invoice?: Invoice | null) {
+  const pdf = new PDFBuilder()
+  const ref = payment.reference || 'PAY-2026-001'
+  const refSafe = ref.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const clientName = client?.name || 'Valued Client'
+  const companyName = client?.business_name || client?.company || clientName
+
+  // Header Bar
+  pdf.fillRect(36, 36, 523, 72, 0.06, 0.09, 0.16)
+  pdf.drawText('CAPE', 50, 52, { fontSize: 20, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('SECURE', 105, 52, { fontSize: 20, bold: true, r: 0.05, g: 0.6, b: 1 })
+  pdf.drawText('PAYMENT RECEIPT & TRANSACTION ACKNOWLEDGEMENT', 50, 74, { fontSize: 7, bold: true, r: 0.6, g: 0.7, b: 0.85 })
+  pdf.drawText('CapeSecure HQ, Kerala, India | contact@capesecure.com', 50, 84, { fontSize: 7, r: 0.5, g: 0.6, b: 0.75 })
+
+  pdf.fillRect(390, 48, 155, 48, 0.1, 0.15, 0.25)
+  pdf.drawText('PAYMENT RECEIPT', 467, 58, { fontSize: 11, bold: true, align: 'center', r: 1, g: 1, b: 1 })
+  pdf.drawText(`REF: ${ref}`, 467, 72, { fontSize: 8, bold: true, align: 'center', r: 0.1, g: 0.8, b: 0.4 })
+  pdf.drawText(`DATE: ${formatDate(payment.received_date || payment.created_at)}`, 467, 83, { fontSize: 7, align: 'center', r: 0.7, g: 0.8, b: 0.9 })
+
+  let curY = 130
+  pdf.fillRect(36, curY, 523, 50, 0.94, 0.98, 0.95)
+  pdf.strokeRect(36, curY, 523, 50, 0.65, 0.85, 0.7, 1)
+  pdf.drawText('PAYMENT RECEIVED WITH THANKS', 297, curY + 12, { fontSize: 10, bold: true, align: 'center', r: 0.1, g: 0.5, b: 0.25 })
+  pdf.drawText(`Amount Received: Rs. ${Number(payment.amount).toLocaleString('en-IN')}`, 297, curY + 28, { fontSize: 13, bold: true, align: 'center', r: 0.08, g: 0.4, b: 0.2 })
+
+  curY = 200
+  pdf.fillRect(36, curY, 523, 130, 0.98, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 523, 130, 0.85, 0.88, 0.92, 1)
+
+  const rows = [
+    ['Payer / Client:', `${companyName} (${clientName})`],
+    ['Payment Method:', (payment.payment_method || 'Bank Transfer').toUpperCase()],
+    ['Payment Type:', (payment.payment_type || 'Advance Payment').toUpperCase()],
+    ['Status:', (payment.status || 'Received').toUpperCase()],
+    ['Invoice Reference:', invoice?.invoice_number || 'Direct Account Credit'],
+    ['Transaction Reference:', payment.reference],
+  ]
+
+  rows.forEach(([k, v], idx) => {
+    const rowY = curY + 12 + (idx * 19)
+    pdf.drawText(k, 50, rowY, { fontSize: 8, bold: true, r: 0.35, g: 0.4, b: 0.45 })
+    pdf.drawText(v, 220, rowY, { fontSize: 8, r: 0.15, g: 0.2, b: 0.25 })
+    pdf.line(50, rowY + 14, 545, rowY + 14, 0.92, 0.93, 0.95, 0.5)
+  })
+
+  // Footer
+  pdf.line(36, 785, 559, 785, 0.85, 0.88, 0.92, 1)
+  pdf.drawText(`CapeSecure Payment Receipt • Ref: ${ref} • Verified`, 36, 795, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+
+  pdf.download(`CapeSecure-Receipt-${refSafe}.pdf`)
+}
+
 
 

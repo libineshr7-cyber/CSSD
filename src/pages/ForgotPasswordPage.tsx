@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
                     required
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="admin@capesecure.co.za"
+                    placeholder="admin@capesecure.com"
                     className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#222222] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D99FF] transition-all"
                   />
                 </div>

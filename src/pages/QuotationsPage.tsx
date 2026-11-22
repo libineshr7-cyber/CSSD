@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
-import { demoQuotations, demoClients } from '../data/demoData'
 import { supabase } from '../lib/supabase'
 import { openPrintableQuotation, downloadQuotationPDF, downloadQuotationHTML } from '../lib/pdfGenerator'
 import { sendQuotationEmail } from '../lib/emailService'
@@ -32,8 +31,8 @@ export const QUOTE_STATUS_CONFIG: Record<string, { label: string; badge: string;
 export default function QuotationsPage() {
   const navigate = useNavigate()
 
-  const [quotations, setQuotations] = useState<Quotation[]>(demoQuotations)
-  const [clients, setClients] = useState<Client[]>(demoClients)
+  const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(false)
 
   // Filters & Sorting
@@ -61,14 +60,14 @@ export default function QuotationsPage() {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setQuotations(data as Quotation[])
       }
     } catch (_) {}
 
     try {
       const { data: clientData } = await (supabase as any).from('clients').select('*')
-      if (clientData && clientData.length > 0) setClients(clientData as Client[])
+      if (clientData) setClients(clientData as Client[])
     } catch (_) {}
     setLoading(false)
   }
@@ -1223,7 +1222,7 @@ function QuotationFormModal({
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">Discount Amount (ZAR):</span>
+                <span className="text-slate-500">Discount Amount (₹):</span>
                 <input
                   type="number"
                   value={discount}

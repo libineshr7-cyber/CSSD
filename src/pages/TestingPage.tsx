@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   TestTube, CheckCircle2, XCircle, AlertTriangle, Play,
   Plus, Search, Bug, ShieldAlert, Clock, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '../lib/utils'
-import { demoProjects } from '../data/demoData'
+import { supabase } from '../lib/supabase'
+import type { Project } from '../types/database'
 
 interface TestCase {
   id: string
@@ -38,7 +39,7 @@ const INITIAL_TESTS: TestCase[] = [
 ]
 
 const INITIAL_BUGS: BugReport[] = [
-  { id: 'BUG-01', title: 'Cart coupon code fails on subtotal under R1000', projectId: 'proj-002', severity: 'high', status: 'open', reportedBy: 'QA Engineer', createdAt: '2026-11-20T10:05:00Z' },
+  { id: 'BUG-01', title: 'Cart coupon code fails on subtotal under ₹1,000', projectId: 'proj-002', severity: 'high', status: 'open', reportedBy: 'QA Engineer', createdAt: '2026-11-20T10:05:00Z' },
   { id: 'BUG-02', title: 'Invoice PDF download button clipped on iPad viewport', projectId: 'proj-001', severity: 'low', status: 'in_progress', reportedBy: 'Lead Designer', createdAt: '2026-11-19T11:30:00Z' },
   { id: 'BUG-03', title: 'Slow query on patient appointment history lookup', projectId: 'proj-003', severity: 'medium', status: 'fixed', reportedBy: 'Backend Lead', createdAt: '2026-11-18T15:00:00Z' },
   { id: 'BUG-04', title: 'Cross-origin header missing for staging API endpoints', projectId: 'proj-001', severity: 'critical', status: 'closed', reportedBy: 'Security Auditor', createdAt: '2026-11-16T09:00:00Z' },
@@ -48,16 +49,30 @@ export default function TestingPage() {
   const [activeTab, setActiveTab] = useState<'tests' | 'bugs'>('tests')
   const [testCases, setTestCases] = useState<TestCase[]>(INITIAL_TESTS)
   const [bugReports, setBugReports] = useState<BugReport[]>(INITIAL_BUGS)
+  const [projects, setProjects] = useState<Project[]>([])
   const [search, setSearch] = useState('')
   const [showBugModal, setShowBugModal] = useState(false)
   const [isRunningAll, setIsRunningAll] = useState(false)
 
   // New bug state
   const [bugTitle, setBugTitle] = useState('')
-  const [bugProject, setBugProject] = useState(demoProjects[0]?.id || '')
+  const [bugProject, setBugProject] = useState('')
   const [bugSeverity, setBugSeverity] = useState<'critical' | 'high' | 'medium' | 'low'>('medium')
 
-  const projectMap = useMemo(() => Object.fromEntries(demoProjects.map(p => [p.id, p])), [])
+  useEffect(() => {
+    async function loadProjects() {
+      try {
+        const { data } = await (supabase as any).from('projects').select('*').order('name', { ascending: true })
+        if (data) {
+          setProjects(data as Project[])
+          if (data.length > 0 && !bugProject) setBugProject(data[0].id)
+        }
+      } catch (_) {}
+    }
+    loadProjects()
+  }, [])
+
+  const projectMap = useMemo(() => Object.fromEntries(projects.map(p => [p.id, p])), [projects])
 
   const stats = useMemo(() => {
     const total = testCases.length
@@ -348,7 +363,8 @@ export default function TestingPage() {
                     onChange={e => setBugProject(e.target.value)}
                     className="input cursor-pointer"
                   >
-                    {demoProjects.map(p => (
+                    <option value="">Select project...</option>
+                    {projects.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>

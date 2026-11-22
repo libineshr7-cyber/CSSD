@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
-import { demoClients } from '../data/demoData'
 import { supabase } from '../lib/supabase'
 import { fetchClientFullHistory, type ClientFullHistory } from '../lib/clientHistory'
 import { openPrintableRequirementSummary } from '../lib/pdfGenerator'
@@ -48,7 +47,7 @@ const CLIENT_STATUS_STYLES: Record<ClientStatus, { badge: string; dot: string; l
 }
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>(demoClients)
+  const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(false)
 
   // Filters & Pagination
@@ -80,7 +79,7 @@ export default function ClientsPage() {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setClients(data as Client[])
       }
     } catch (_) {}
@@ -849,10 +848,10 @@ function ClientFormModal({
     email: initial?.email || '',
     phone: initial?.phone || '',
     address: initial?.address || '',
-    city: initial?.city || 'Cape Town',
-    state: initial?.state || 'Western Cape',
+    city: initial?.city || '',
+    state: initial?.state || '',
     postal_code: initial?.postal_code || '',
-    country: initial?.country || 'South Africa',
+    country: initial?.country || 'India',
     gstin: initial?.gstin || '',
     preferred_comm: (initial?.preferred_comm || 'email') as PreferredComm,
     status: (initial?.status || 'active') as ClientStatus,
@@ -1007,7 +1006,7 @@ function ClientFormModal({
                   setForm({ ...form, email: e.target.value })
                   checkDuplicate(e.target.value, form.phone, form.gstin)
                 }}
-                placeholder="client@apexfin.co.za"
+                placeholder="client@example.com"
                 className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
               />
             </div>

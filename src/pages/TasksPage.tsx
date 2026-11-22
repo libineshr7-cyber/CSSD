@@ -1,12 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Plus, Search, CheckSquare, Clock, AlertCircle, Calendar,
-  User, Tag, CheckCircle2, LayoutGrid, List, Filter
+  User, Tag, CheckCircle2, LayoutGrid, List, Filter, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '../lib/utils'
-import { demoTasks, demoProjects } from '../data/demoData'
-import type { Task, TaskStatus, TaskPriority } from '../types/database'
+import { supabase } from '../lib/supabase'
+import type { Task, TaskStatus, TaskPriority, Project } from '../types/database'
 
 const STATUS_CONFIG: Record<TaskStatus, { label: string; badge: string; column: string }> = {
   todo:        { label: 'To Do',       badge: 'bg-slate-500/10 text-slate-400 border border-slate-500/20', column: 'To Do' },
@@ -26,7 +26,9 @@ const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; bord
 const COLUMNS: TaskStatus[] = ['todo', 'in_progress', 'review', 'done', 'blocked']
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(demoTasks)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'board' | 'list'>('board')
   const [search, setSearch] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
@@ -35,14 +37,50 @@ export default function TasksPage() {
 
   // Form states
   const [title, setTitle] = useState('')
-  const [projectId, setProjectId] = useState(demoProjects[0]?.id || '')
+  const [projectId, setProjectId] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<TaskStatus>('todo')
   const [priority, setPriority] = useState<TaskPriority>('medium')
   const [assignedTo, setAssignedTo] = useState('CapeSecure Dev Team')
   const [dueDate, setDueDate] = useState('')
 
-  const projectMap = useMemo(() => Object.fromEntries(demoProjects.map(p => [p.id, p])), [])
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [
+        { data: taskData },
+        { data: projData },
+      ] = await Promise.all([
+        (supabase as any).from('tasks').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('projects').select('*').order('name', { ascending: true }),
+      ])
+      if (taskData) setTasks(taskData as Task[])
+      if (projData) {
+        setProjects(projData as Project[])
+        if (projData.length > 0 && !projectId) {
+          setProjectId(projData[0].id)
+        }
+      }
+    } catch (_) {}
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadData()
+
+    const channel = supabase
+      .channel('capesecure-tasks-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        loadData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  const projectMap = useMemo(() => Object.fromEntries(projects.map(p => [p.id, p])), [projects])
 
   const filtered = useMemo(() => {
     return tasks.filter(t => {
@@ -54,16 +92,15 @@ export default function TasksPage() {
     })
   }, [tasks, search, projectFilter, priorityFilter])
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) {
       toast.error('Task title is required')
       return
     }
 
-    const newTask: Task = {
-      id: `task-${Date.now()}`,
-      project_id: projectId,
+    const newTaskData = {
+      project_id: projectId || null,
       title,
       description: description || null,
       status,
@@ -76,31 +113,65 @@ export default function TasksPage() {
       updated_at: new Date().toISOString(),
     }
 
-    setTasks([newTask, ...tasks])
-    setShowModal(false)
-    setTitle('')
-    setDescription('')
-    toast.success('Task created successfully!')
+    try {
+      const { data, error } = await (supabase as any)
+        .from('tasks')
+        .insert([newTaskData])
+        .select()
+        .single()
+
+      if (!error && data) {
+        setTasks([data as Task, ...tasks])
+      } else {
+        setTasks([{ id: `task-${Date.now()}`, ...newTaskData } as Task, ...tasks])
+      }
+      setShowModal(false)
+      setTitle('')
+      setDescription('')
+      toast.success('Task created successfully!')
+    } catch (err) {
+      toast.error('Failed to create task in Supabase')
+    }
   }
 
-  const toggleTaskStatus = (task: Task) => {
+  const toggleTaskStatus = async (task: Task) => {
     const nextStatus: TaskStatus = task.status === 'done' ? 'todo' : 'done'
+    const completedAt = nextStatus === 'done' ? new Date().toISOString() : null
+    const updatedAt = new Date().toISOString()
+
     setTasks(prev => prev.map(t => t.id === task.id ? {
       ...t,
       status: nextStatus,
-      completed_at: nextStatus === 'done' ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString()
+      completed_at: completedAt,
+      updated_at: updatedAt
     } : t))
-    toast.success(nextStatus === 'done' ? 'Task completed!' : 'Task re-opened')
+
+    try {
+      await (supabase as any)
+        .from('tasks')
+        .update({ status: nextStatus, completed_at: completedAt, updated_at: updatedAt })
+        .eq('id', task.id)
+      toast.success(nextStatus === 'done' ? 'Task completed!' : 'Task re-opened')
+    } catch (_) {}
   }
 
-  const moveTask = (taskId: string, newStatus: TaskStatus) => {
+  const moveTask = async (taskId: string, newStatus: TaskStatus) => {
+    const completedAt = newStatus === 'done' ? new Date().toISOString() : null
+    const updatedAt = new Date().toISOString()
+
     setTasks(prev => prev.map(t => t.id === taskId ? {
       ...t,
       status: newStatus,
-      completed_at: newStatus === 'done' ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString()
+      completed_at: completedAt,
+      updated_at: updatedAt
     } : t))
+
+    try {
+      await (supabase as any)
+        .from('tasks')
+        .update({ status: newStatus, completed_at: completedAt, updated_at: updatedAt })
+        .eq('id', taskId)
+    } catch (_) {}
   }
 
   return (
@@ -165,7 +236,7 @@ export default function TasksPage() {
           className="input sm:w-56"
         >
           <option value="all">All Projects</option>
-          {demoProjects.map(p => (
+          {projects.map(p => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
@@ -357,7 +428,8 @@ export default function TasksPage() {
                   onChange={e => setProjectId(e.target.value)}
                   className="input cursor-pointer"
                 >
-                  {demoProjects.map(p => (
+                  <option value="">Select project...</option>
+                  {projects.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
@@ -368,7 +440,7 @@ export default function TasksPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Implement PayFast payment gateway webhook"
+                  placeholder="e.g. Implement payment gateway webhook & security audit"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   className="input"

@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
-import { demoLeads, demoClients } from '../data/demoData'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import type { Lead, LeadStatus, LeadSource, Client, LeadNoteItem } from '../types/database'
@@ -47,8 +46,8 @@ export default function LeadsPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   
-  const [leads, setLeads] = useState<Lead[]>(demoLeads)
-  const [clients, setClients] = useState<Client[]>(demoClients)
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(false)
   
   // Filters & State
@@ -82,7 +81,7 @@ export default function LeadsPage() {
     businessCategory: 'Corporate & Services',
     preferredComm: 'email' as const,
     address: '',
-    city: 'Cape Town',
+    city: '',
     gstin: '',
   })
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null)
@@ -96,7 +95,7 @@ export default function LeadsPage() {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setLeads(data as Lead[])
       }
     } catch (_) {}
@@ -105,7 +104,7 @@ export default function LeadsPage() {
       const { data: clientData } = await (supabase as any)
         .from('clients')
         .select('*')
-      if (clientData && clientData.length > 0) {
+      if (clientData) {
         setClients(clientData as Client[])
       }
     } catch (_) {}
@@ -1419,7 +1418,7 @@ function LeadFormModal({
             </div>
 
             <div>
-              <label className="block text-slate-500 mb-1">Budget (ZAR)</label>
+              <label className="block text-slate-500 mb-1">Budget (₹)</label>
               <input
                 type="number"
                 value={form.budget}

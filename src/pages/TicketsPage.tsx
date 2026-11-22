@@ -1,12 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   LifeBuoy, Plus, Search, MessageSquare, Clock, CheckCircle2,
-  AlertCircle, ChevronRight, User, Send, Filter, AlertTriangle
+  AlertCircle, ChevronRight, User, Send, Filter, AlertTriangle, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '../lib/utils'
-import { demoTickets, demoClients, demoProjects } from '../data/demoData'
-import type { SupportTicket, TicketStatus, TicketPriority } from '../types/database'
+import { supabase } from '../lib/supabase'
+import type { SupportTicket, TicketStatus, TicketPriority, Client, Project } from '../types/database'
 
 const STATUS_CONFIG: Record<TicketStatus, { label: string; badge: string }> = {
   open:        { label: 'Open',        badge: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
@@ -24,7 +24,10 @@ const PRIORITY_CONFIG: Record<TicketPriority, { label: string; color: string }> 
 }
 
 export default function TicketsPage() {
-  const [tickets, setTickets] = useState<SupportTicket[]>(demoTickets)
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -35,14 +38,51 @@ export default function TicketsPage() {
   const [replyText, setReplyText] = useState('')
 
   // New ticket state
-  const [clientId, setClientId] = useState(demoClients[0]?.id || '')
+  const [clientId, setClientId] = useState('')
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('Technical Issue')
   const [priority, setPriority] = useState<TicketPriority>('medium')
 
-  const clientMap = useMemo(() => Object.fromEntries(demoClients.map(c => [c.id, c])), [])
-  const projectMap = useMemo(() => Object.fromEntries(demoProjects.map(p => [p.id, p])), [])
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [
+        { data: tData },
+        { data: cData },
+        { data: prData },
+      ] = await Promise.all([
+        (supabase as any).from('support_tickets').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
+        (supabase as any).from('projects').select('*').order('name', { ascending: true }),
+      ])
+      if (tData) setTickets(tData as SupportTicket[])
+      if (cData) {
+        setClients(cData as Client[])
+        if (cData.length > 0 && !clientId) setClientId(cData[0].id)
+      }
+      if (prData) setProjects(prData as Project[])
+    } catch (_) {}
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadData()
+
+    const channel = supabase
+      .channel('capesecure-tickets-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, () => {
+        loadData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  const clientMap = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients])
+  const projectMap = useMemo(() => Object.fromEntries(projects.map(p => [p.id, p])), [projects])
 
   const stats = useMemo(() => {
     const total = tickets.length
@@ -58,25 +98,24 @@ export default function TicketsPage() {
       const matchSearch =
         t.ticket_number.toLowerCase().includes(search.toLowerCase()) ||
         t.subject.toLowerCase().includes(search.toLowerCase()) ||
-        (client?.name.toLowerCase().includes(search.toLowerCase()) ?? false)
+        (client?.name?.toLowerCase().includes(search.toLowerCase()) ?? false)
       const matchStatus = statusFilter === 'all' || t.status === statusFilter
       const matchPri = priorityFilter === 'all' || t.priority === priorityFilter
       return matchSearch && matchStatus && matchPri
     })
   }, [tickets, search, statusFilter, priorityFilter, clientMap])
 
-  const handleCreateTicket = (e: React.FormEvent) => {
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!subject) return
 
-    const newTicket: SupportTicket = {
-      id: `tick-${Date.now()}`,
-      client_id: clientId,
+    const newTicketData = {
+      client_id: clientId || null,
       project_id: null,
-      ticket_number: `TKT-00${tickets.length + 1}`,
+      ticket_number: `TKT-${String(tickets.length + 1).padStart(3, '0')}`,
       subject,
       description,
-      status: 'open',
+      status: 'open' as TicketStatus,
       priority,
       category,
       resolved_at: null,
@@ -84,24 +123,46 @@ export default function TicketsPage() {
       updated_at: new Date().toISOString()
     }
 
-    setTickets([newTicket, ...tickets])
-    setShowCreateModal(false)
-    setSubject('')
-    setDescription('')
-    toast.success('Support ticket opened successfully!')
+    try {
+      const { data, error } = await (supabase as any)
+        .from('support_tickets')
+        .insert([newTicketData])
+        .select()
+        .single()
+
+      if (!error && data) {
+        setTickets([data as SupportTicket, ...tickets])
+      } else {
+        setTickets([{ id: `tick-${Date.now()}`, ...newTicketData } as SupportTicket, ...tickets])
+      }
+      setShowCreateModal(false)
+      setSubject('')
+      setDescription('')
+      toast.success('Support ticket opened successfully!')
+    } catch (_) {
+      toast.error('Failed to create ticket')
+    }
   }
 
-  const handleResolveTicket = (ticketId: string) => {
+  const handleResolveTicket = async (ticketId: string) => {
+    const now = new Date().toISOString()
     setTickets(prev => prev.map(t => t.id === ticketId ? {
       ...t,
       status: 'resolved',
-      resolved_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      resolved_at: now,
+      updated_at: now
     } : t))
     if (activeTicket && activeTicket.id === ticketId) {
       setActiveTicket(prev => prev ? { ...prev, status: 'resolved' } : null)
     }
-    toast.success('Ticket marked as resolved!')
+
+    try {
+      await (supabase as any)
+        .from('support_tickets')
+        .update({ status: 'resolved', resolved_at: now, updated_at: now })
+        .eq('id', ticketId)
+      toast.success('Ticket marked as resolved!')
+    } catch (_) {}
   }
 
   const handleSendReply = (e: React.FormEvent) => {
@@ -372,8 +433,9 @@ export default function TicketsPage() {
                   onChange={e => setClientId(e.target.value)}
                   className="input cursor-pointer"
                 >
-                  {demoClients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.company})</option>
+                  <option value="">Select client...</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.business_name || c.company || c.name} ({c.name})</option>
                   ))}
                 </select>
               </div>

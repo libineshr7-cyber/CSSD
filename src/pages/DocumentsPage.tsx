@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { supabase } from '../lib/supabase';
 import {
   FileText,
   FileImage,
@@ -49,134 +50,9 @@ interface Document {
   projectName?: string;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Real-Time Database State ────────────────────────────────────────────────
 
-const MOCK_DOCUMENTS: Document[] = [
-  {
-    id: '1',
-    name: 'Service_Agreement_2024.pdf',
-    description: 'Annual service agreement for security monitoring services.',
-    category: 'Agreement',
-    fileType: 'pdf',
-    size: '1.2 MB',
-    sizeBytes: 1258291,
-    uploadDate: '2024-01-15',
-    isPrivate: true,
-    clientName: 'Atlantic Retail Group',
-    projectName: 'ARG Security Monitoring',
-  },
-  {
-    id: '2',
-    name: 'Invoice_INV-2024-0042.pdf',
-    description: 'Invoice for CCTV installation at Harbour Point.',
-    category: 'Invoice',
-    fileType: 'pdf',
-    size: '342 KB',
-    sizeBytes: 350208,
-    uploadDate: '2024-02-03',
-    isPrivate: false,
-    clientName: 'Harbour Point Mall',
-    projectName: 'CCTV Upgrade Phase 1',
-  },
-  {
-    id: '3',
-    name: 'Site_Layout_HarbourPoint.png',
-    description: 'Annotated site layout showing camera placement zones.',
-    category: 'Design',
-    fileType: 'image',
-    size: '4.7 MB',
-    sizeBytes: 4927488,
-    uploadDate: '2024-02-10',
-    isPrivate: true,
-    clientName: 'Harbour Point Mall',
-    projectName: 'CCTV Upgrade Phase 1',
-  },
-  {
-    id: '4',
-    name: 'Security_Proposal_GovHQ.docx',
-    description: 'Detailed quotation and scope for government HQ perimeter.',
-    category: 'Quotation',
-    fileType: 'word',
-    size: '890 KB',
-    sizeBytes: 911360,
-    uploadDate: '2024-03-01',
-    isPrivate: true,
-    clientName: 'Cape Town Municipality',
-    projectName: 'HQ Perimeter Security',
-  },
-  {
-    id: '5',
-    name: 'NDA_CapeSecure_Client.pdf',
-    description: 'Non-disclosure agreement template for new clients.',
-    category: 'Contract',
-    fileType: 'pdf',
-    size: '210 KB',
-    sizeBytes: 215040,
-    uploadDate: '2024-03-14',
-    isPrivate: true,
-  },
-  {
-    id: '6',
-    name: 'Monthly_Security_Report_Feb2024.docx',
-    description: 'Monthly incident and performance report for February 2024.',
-    category: 'Report',
-    fileType: 'word',
-    size: '1.8 MB',
-    sizeBytes: 1887437,
-    uploadDate: '2024-03-05',
-    isPrivate: false,
-    clientName: 'Atlantic Retail Group',
-  },
-  {
-    id: '7',
-    name: 'Camera_Specs_Hikvision.zip',
-    description: 'Technical datasheets and firmware bundle for Hikvision cams.',
-    category: 'Other',
-    fileType: 'zip',
-    size: '23.4 MB',
-    sizeBytes: 24539136,
-    uploadDate: '2024-01-28',
-    isPrivate: false,
-  },
-  {
-    id: '8',
-    name: 'Site_Photos_GovHQ.zip',
-    description: 'Site survey photos from the government HQ walkthrough.',
-    category: 'Design',
-    fileType: 'zip',
-    size: '67.1 MB',
-    sizeBytes: 70333235,
-    uploadDate: '2024-02-20',
-    isPrivate: true,
-    clientName: 'Cape Town Municipality',
-    projectName: 'HQ Perimeter Security',
-  },
-  {
-    id: '9',
-    name: 'Invoice_INV-2024-0051.pdf',
-    description: 'Invoice for access control hardware supply.',
-    category: 'Invoice',
-    fileType: 'pdf',
-    size: '298 KB',
-    sizeBytes: 305152,
-    uploadDate: '2024-03-20',
-    isPrivate: false,
-    clientName: 'Cape Town Municipality',
-  },
-  {
-    id: '10',
-    name: 'Server_Room_Layout.png',
-    description: 'Rack layout and cable routing diagram for server room.',
-    category: 'Design',
-    fileType: 'image',
-    size: '3.2 MB',
-    sizeBytes: 3354214,
-    uploadDate: '2024-03-25',
-    isPrivate: true,
-    clientName: 'Atlantic Retail Group',
-    projectName: 'ARG Security Monitoring',
-  },
-];
+const MOCK_DOCUMENTS: Document[] = [];
 
 const CATEGORIES: Category[] = [
   'Agreement',
@@ -188,17 +64,8 @@ const CATEGORIES: Category[] = [
   'Other',
 ];
 
-const CLIENT_OPTIONS = [
-  'Atlantic Retail Group',
-  'Harbour Point Mall',
-  'Cape Town Municipality',
-];
-
-const PROJECT_OPTIONS = [
-  'ARG Security Monitoring',
-  'CCTV Upgrade Phase 1',
-  'HQ Perimeter Security',
-];
+const CLIENT_OPTIONS: string[] = [];
+const PROJECT_OPTIONS: string[] = [];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -733,6 +600,34 @@ const DocumentsPage: React.FC = () => {
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+
+  useEffect(() => {
+    async function fetchDocs() {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('documents')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          const mapped: Document[] = data.map((d: any) => ({
+            id: d.id,
+            name: d.name || d.title || 'Document',
+            description: d.description || '',
+            category: d.category || 'Other',
+            fileType: d.file_type || 'pdf',
+            size: d.size || '1.0 MB',
+            sizeBytes: d.size_bytes || 1048576,
+            uploadDate: d.created_at || new Date().toISOString(),
+            isPrivate: d.is_private ?? true,
+            clientName: d.client_name,
+            projectName: d.project_name,
+          }));
+          setDocuments(mapped);
+        }
+      } catch (_) {}
+    }
+    fetchDocs();
+  }, []);
 
   // Derived stats
   const totalDocs = documents.length;

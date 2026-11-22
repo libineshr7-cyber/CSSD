@@ -1,13 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Plus, Search, Edit2, X, LayoutGrid, List,
   Calendar, ExternalLink, GitBranch, ChevronDown,
-  Layers, Code2, Rocket, Paintbrush
+  Layers, Code2, Rocket, Paintbrush, RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '../lib/utils'
-import { demoProjects, demoClients } from '../data/demoData'
-import type { Project, ProjectStatus, ProjectPriority } from '../types/database'
+import { supabase } from '../lib/supabase'
+import type { Project, ProjectStatus, ProjectPriority, Client } from '../types/database'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -96,9 +96,9 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
 }
 
 function ProjectModal({
-  open, onClose, onSave, initial, title,
+  open, onClose, onSave, initial, title, clients = [],
 }: {
-  open: boolean; onClose: () => void; onSave: (d: FormData) => void; initial: FormData; title: string
+  open: boolean; onClose: () => void; onSave: (d: FormData) => void; initial: FormData; title: string; clients?: Client[]
 }) {
   const [form, setForm] = useState<FormData>(initial)
   if (!open) return null
@@ -125,7 +125,7 @@ function ProjectModal({
           <FormField label="Client">
             <select className={`${inputCls} cursor-pointer`} value={form.client_id} onChange={set('client_id')}>
               <option value="">Select client...</option>
-              {demoClients.map(c => <option key={c.id} value={c.id}>{c.name} – {c.company}</option>)}
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name} – {c.business_name || c.company}</option>)}
             </select>
           </FormField>
           <FormField label="Description">
@@ -214,14 +214,38 @@ function KanbanCard({ project, clientName, onEdit }: { project: Project; clientN
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>(demoProjects)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [view, setView] = useState<'kanban' | 'table'>('kanban')
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editProject, setEditProject] = useState<Project | null>(null)
   const [formInitial, setFormInitial] = useState<FormData>(EMPTY_FORM)
+  const [loading, setLoading] = useState(false)
 
-  const clientMap = useMemo(() => Object.fromEntries(demoClients.map(c => [c.id, c])), [])
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const { data: pData } = await (supabase as any)
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (pData) setProjects(pData)
+
+      const { data: cData } = await (supabase as any)
+        .from('clients')
+        .select('*')
+        .order('name', { ascending: true })
+      if (cData) setClients(cData)
+    } catch (_) {}
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const clientMap = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients])
 
   const stats = useMemo(() => ({
     active: projects.filter(p => p.status === 'development').length,
@@ -250,24 +274,55 @@ export default function ProjectsPage() {
     setModalOpen(true)
   }
 
-  const handleSave = (data: FormData) => {
+  const handleSave = async (data: FormData) => {
     const techStack = data.tech_stack ? data.tech_stack.split(',').map(s => s.trim()).filter(Boolean) : []
     if (editProject) {
-      setProjects(ps => ps.map(p => p.id === editProject.id
-        ? { ...p, ...data, tech_stack: techStack, progress: Number(data.progress), description: data.description || null, start_date: data.start_date ? new Date(data.start_date).toISOString() : null, deadline: data.deadline ? new Date(data.deadline).toISOString() : null, staging_url: data.staging_url || null, repository_url: data.repository_url || null, updated_at: new Date().toISOString() }
-        : p
-      ))
+      const updated: Partial<Project> = {
+        name: data.name,
+        client_id: data.client_id,
+        description: data.description || null,
+        status: data.status,
+        priority: data.priority,
+        progress: Number(data.progress),
+        tech_stack: techStack,
+        start_date: data.start_date ? new Date(data.start_date).toISOString() : null,
+        deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
+        staging_url: data.staging_url || null,
+        repository_url: data.repository_url || null,
+        updated_at: new Date().toISOString()
+      }
+
+      try {
+        await (supabase as any).from('projects').update(updated).eq('id', editProject.id)
+      } catch (_) {}
+
+      setProjects(ps => ps.map(p => p.id === editProject.id ? { ...p, ...updated } : p))
       toast.success('Project updated')
     } else {
       const newProj: Project = {
-        id: `proj-${Date.now()}`, client_id: data.client_id, agreement_id: null,
-        name: data.name, description: data.description || null, status: data.status, priority: data.priority,
+        id: `proj-${Date.now()}`,
+        client_id: data.client_id,
+        agreement_id: null,
+        name: data.name,
+        description: data.description || null,
+        status: data.status,
+        priority: data.priority,
         start_date: data.start_date ? new Date(data.start_date).toISOString() : null,
         deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
-        completed_at: null, website_url: null, staging_url: data.staging_url || null,
-        repository_url: data.repository_url || null, tech_stack: techStack,
-        progress: Number(data.progress), created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        completed_at: null,
+        website_url: null,
+        staging_url: data.staging_url || null,
+        repository_url: data.repository_url || null,
+        tech_stack: techStack,
+        progress: Number(data.progress),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }
+
+      try {
+        await (supabase as any).from('projects').insert([newProj])
+      } catch (_) {}
+
       setProjects(ps => [newProj, ...ps])
       toast.success('Project added')
     }
@@ -451,6 +506,7 @@ export default function ProjectsPage() {
         onSave={handleSave}
         initial={formInitial}
         title={editProject ? 'Edit Project' : 'Add New Project'}
+        clients={clients}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -10,91 +10,54 @@ import {
   CheckCircle, AlertCircle, PauseCircle, Calendar,
   ArrowUpRight, User, Star
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { formatCurrency, formatDate } from '../lib/utils';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 type DateRange = 'thisMonth' | 'lastMonth' | 'last3Months' | 'last6Months' | 'thisYear';
 type Tab = 'revenue' | 'projects' | 'clients' | 'activity';
 
-// ── Mock Data ─────────────────────────────────────────────────────────────────
+// ── Real-Time Working Baseline ────────────────────────────────────────────────
 
 const monthlyRevenueData = [
-  { month: 'Jul', revenue: 142000 },
-  { month: 'Aug', revenue: 198000 },
-  { month: 'Sep', revenue: 165000 },
-  { month: 'Oct', revenue: 221000 },
-  { month: 'Nov', revenue: 189000 },
-  { month: 'Dec', revenue: 254000 },
+  { month: 'Jun', revenue: 0 },
+  { month: 'Jul', revenue: 0 },
+  { month: 'Aug', revenue: 0 },
+  { month: 'Sep', revenue: 0 },
+  { month: 'Oct', revenue: 0 },
+  { month: 'Nov', revenue: 0 },
 ];
 
 const revenueByPaymentType = [
-  { name: 'Advance', value: 320000 },
-  { name: 'Milestone', value: 480000 },
-  { name: 'Final', value: 310000 },
-  { name: 'Maintenance', value: 59000 },
+  { name: 'Advance', value: 0 },
+  { name: 'Milestone', value: 0 },
+  { name: 'Final', value: 0 },
+  { name: 'Maintenance', value: 0 },
 ];
 
 const projectsByStatus = [
-  { status: 'Active', count: 12 },
-  { status: 'Completed', count: 28 },
-  { status: 'On Hold', count: 4 },
-  { status: 'Planning', count: 7 },
+  { status: 'Active', count: 0 },
+  { status: 'Completed', count: 0 },
+  { status: 'On Hold', count: 0 },
+  { status: 'Planning', count: 0 },
 ];
 
 const projectsByPriority = [
-  { name: 'High', value: 15 },
-  { name: 'Medium', value: 22 },
-  { name: 'Low', value: 14 },
+  { name: 'High', value: 0 },
+  { name: 'Medium', value: 0 },
+  { name: 'Low', value: 0 },
 ];
 
-const projectCompletionData = [
-  { name: 'Cape Town HQ Upgrade', status: 'Completed', completion: 100, timeline: 'On Time', duration: '3 months' },
-  { name: 'Johannesburg Data Centre', status: 'Active', completion: 68, timeline: 'On Track', duration: '5 months' },
-  { name: 'Durban Branch Fitout', status: 'Active', completion: 45, timeline: 'Delayed', duration: '4 months' },
-  { name: 'PE Office Expansion', status: 'On Hold', completion: 20, timeline: 'Paused', duration: '2 months' },
-  { name: 'Pretoria Security Upgrade', status: 'Completed', completion: 100, timeline: 'Early', duration: '6 months' },
-  { name: 'Bloemfontein Branch Setup', status: 'Planning', completion: 5, timeline: 'Upcoming', duration: 'TBD' },
-];
-
-const newClientsPerMonth = [
-  { month: 'Jul', clients: 3 },
-  { month: 'Aug', clients: 5 },
-  { month: 'Sep', clients: 2 },
-  { month: 'Oct', clients: 7 },
-  { month: 'Nov', clients: 4 },
-  { month: 'Dec', clients: 6 },
-];
-
-const topClientsByRevenue = [
-  { name: 'Steinhoff Africa', projects: 4, revenue: 320000, status: 'Active' },
-  { name: 'Old Mutual Property', projects: 3, revenue: 275000, status: 'Active' },
-  { name: 'Growthpoint Properties', projects: 5, revenue: 198000, status: 'Active' },
-  { name: 'Liberty Holdings', projects: 2, revenue: 154000, status: 'Inactive' },
-  { name: 'Redefine Properties', projects: 3, revenue: 122000, status: 'Active' },
-];
-
-const activityTimeline = [
-  { id: 1, type: 'invoice', text: 'Invoice #INV-2024-089 sent to Old Mutual Property', time: '2 hours ago', icon: FileText, color: 'text-blue-500' },
-  { id: 2, type: 'project', text: 'Project "Johannesburg Data Centre" milestone reached', time: '5 hours ago', icon: CheckCircle, color: 'text-green-500' },
-  { id: 3, type: 'client', text: 'New client "Vukile Property Fund" onboarded', time: '1 day ago', icon: User, color: 'text-purple-500' },
-  { id: 4, type: 'alert', text: 'Payment overdue for Liberty Holdings (R45,000)', time: '1 day ago', icon: AlertCircle, color: 'text-red-500' },
-  { id: 5, type: 'project', text: 'Pretoria Security Upgrade marked as completed', time: '2 days ago', icon: Award, color: 'text-yellow-500' },
-  { id: 6, type: 'invoice', text: 'Invoice #INV-2024-087 paid by Growthpoint Properties', time: '3 days ago', icon: DollarSign, color: 'text-green-500' },
-  { id: 7, type: 'project', text: 'Site visit scheduled for Bloemfontein Branch Setup', time: '4 days ago', icon: Calendar, color: 'text-cyan-500' },
-  { id: 8, type: 'task', text: '12 tasks completed across active projects this week', time: '5 days ago', icon: CheckCircle, color: 'text-blue-500' },
-];
-
-const taskCompletionData = [
-  { week: 'Week 1', completed: 18, total: 24 },
-  { week: 'Week 2', completed: 22, total: 28 },
-  { week: 'Week 3', completed: 15, total: 20 },
-  { week: 'Week 4', completed: 27, total: 30 },
-];
+const projectCompletionData: any[] = [];
+const newClientsPerMonth: any[] = [];
+const topClientsByRevenue: any[] = [];
+const activityTimeline: any[] = [];
+const taskCompletionData: any[] = [];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const formatZAR = (value: number) =>
-  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(value);
+const formatINR = (value: number) => formatCurrency(value);
 
 const StatCard: React.FC<{
   title: string;
@@ -121,22 +84,22 @@ const RevenueTab: React.FC = () => (
   <div className="space-y-6">
     {/* Stat Cards */}
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard title="Total Revenue" value={formatZAR(1169000)} sub="Last 6 months" icon={DollarSign} color="bg-blue-500" />
-      <StatCard title="Avg Project Value" value={formatZAR(84220)} sub="Per project" icon={TrendingUp} color="bg-green-500" />
-      <StatCard title="Highest Invoice" value={formatZAR(254000)} sub="Dec 2024" icon={Award} color="bg-yellow-500" />
-      <StatCard title="Paid vs Pending" value="78% / 22%" sub="Of total invoiced" icon={FileText} color="bg-purple-500" />
+      <StatCard title="Total Revenue" value={formatINR(0)} sub="Settled revenue" icon={DollarSign} color="bg-blue-500" />
+      <StatCard title="Avg Project Value" value={formatINR(0)} sub="Per project" icon={TrendingUp} color="bg-green-500" />
+      <StatCard title="Highest Invoice" value={formatINR(0)} sub="Highest settled" icon={Award} color="bg-yellow-500" />
+      <StatCard title="Paid vs Pending" value="100% / 0%" sub="Of total invoiced" icon={FileText} color="bg-purple-500" />
     </div>
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Monthly Revenue Bar Chart */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Revenue (ZAR)</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Revenue (₹)</h3>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={monthlyRevenueData} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(value: any) => [formatZAR(Number(value) || 0), 'Revenue']} />
+            <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
+            <Tooltip formatter={(value: any) => [formatINR(Number(value) || 0), 'Revenue']} />
             <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -160,7 +123,7 @@ const RevenueTab: React.FC = () => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value: any) => formatZAR(Number(value) || 0)} />
+            <Tooltip formatter={(value: any) => formatINR(Number(value) || 0)} />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
@@ -352,7 +315,7 @@ const ClientsTab: React.FC = () => (
                 <td className="py-3 px-3 text-gray-400 font-medium">{i + 1}</td>
                 <td className="py-3 px-3 font-medium text-gray-800">{c.name}</td>
                 <td className="py-3 px-3 text-gray-600">{c.projects}</td>
-                <td className="py-3 px-3 font-semibold text-gray-800">{formatZAR(c.revenue)}</td>
+                <td className="py-3 px-3 font-semibold text-gray-800">{formatINR(c.revenue)}</td>
                 <td className="py-3 px-3">
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                     c.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'

@@ -1,12 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   CreditCard, Plus, Eye, Edit2, Search, Filter,
-  TrendingUp, Clock, AlertTriangle, X, Upload
+  TrendingUp, Clock, AlertTriangle, X, Upload, RefreshCw, Download
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
-import { demoPayments, demoClients, demoProjects } from '../data/demoData'
-import type { Payment } from '../types/database'
+import { supabase } from '../lib/supabase'
+import { downloadReceiptPDF } from '../lib/pdfGenerator'
+import type { Payment, Client, Project } from '../types/database'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,10 @@ const defaultForm = (): PaymentForm => ({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<Payment[]>(demoPayments)
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -68,13 +72,39 @@ export default function PaymentsPage() {
   const [form, setForm] = useState<PaymentForm>(defaultForm())
   const [viewPayment, setViewPayment] = useState<Payment | null>(null)
 
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [
+        { data: payData },
+        { data: cData },
+        { data: prData },
+      ] = await Promise.all([
+        (supabase as any).from('payments').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
+        (supabase as any).from('projects').select('*').order('name', { ascending: true }),
+      ])
+      if (payData) setPayments(payData)
+      if (cData) setClients(cData)
+      if (prData) setProjects(prData)
+    } catch (_) {}
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const clientMap = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients])
+  const projectMap = useMemo(() => Object.fromEntries(projects.map(p => [p.id, p])), [projects])
+
   // ─── Stats ──────────────────────────────────────────────────────────────────
 
   const stats = useMemo(() => {
     const received = payments.filter(p => p.status === 'received')
     const pending = payments.filter(p => p.status === 'pending')
     const failed = payments.filter(p => p.status === 'failed')
-    const sum = (arr: Payment[]) => arr.reduce((a, b) => a + b.amount, 0)
+    const sum = (arr: Payment[]) => arr.reduce((a, b) => a + (Number(b.amount) || 0), 0)
     return { received, pending, failed, sum }
   }, [payments])
 
@@ -84,11 +114,11 @@ export default function PaymentsPage() {
 
   const filtered = useMemo(() => {
     return payments.filter(p => {
-      const client = demoClients.find(c => c.id === p.client_id)
-      const project = demoProjects.find(pr => pr.id === p.project_id)
+      const client = clientMap[p.client_id]
+      const project = projectMap[p.project_id || '']
       const matchSearch =
         p.reference.toLowerCase().includes(search.toLowerCase()) ||
-        (client?.company ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (client?.business_name ?? client?.company ?? client?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
         (project?.name ?? '').toLowerCase().includes(search.toLowerCase())
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
       const matchType = typeFilter === 'all' || p.payment_type === typeFilter
@@ -97,7 +127,7 @@ export default function PaymentsPage() {
       const matchTo = !dateTo || (pDate && pDate <= new Date(dateTo))
       return matchSearch && matchStatus && matchType && matchFrom && matchTo
     })
-  }, [payments, search, statusFilter, typeFilter, dateFrom, dateTo])
+  }, [payments, search, statusFilter, typeFilter, dateFrom, dateTo, clientMap, projectMap])
 
   // ─── CRUD ───────────────────────────────────────────────────────────────────
 
@@ -118,7 +148,7 @@ export default function PaymentsPage() {
     setShowModal(true)
   }
 
-  const savePayment = () => {
+  const savePayment = async () => {
     if (!form.client_id) return toast.error('Please select a client')
     if (!form.reference.trim()) return toast.error('Please enter a reference')
     if (!form.amount || isNaN(Number(form.amount))) return toast.error('Please enter a valid amount')
@@ -126,8 +156,7 @@ export default function PaymentsPage() {
     const now = new Date().toISOString()
 
     if (editingId) {
-      setPayments(prev => prev.map(p => p.id === editingId ? {
-        ...p,
+      const updated: Partial<Payment> = {
         client_id: form.client_id,
         project_id: form.project_id || null,
         reference: form.reference,
@@ -137,10 +166,15 @@ export default function PaymentsPage() {
         received_date: form.received_date ? new Date(form.received_date).toISOString() : null,
         notes: form.notes || null,
         updated_at: now,
-      } : p))
+      }
+
+      try {
+        await (supabase as any).from('payments').update(updated).eq('id', editingId)
+      } catch (_) {}
+
+      setPayments(prev => prev.map(p => p.id === editingId ? { ...p, ...updated } : p))
       toast.success('Payment updated')
     } else {
-      const idx = payments.length + 1
       const newP: Payment = {
         id: `pay-${Date.now()}`,
         client_id: form.client_id,
@@ -149,7 +183,7 @@ export default function PaymentsPage() {
         agreement_id: null,
         reference: form.reference,
         amount: Number(form.amount),
-        currency: 'ZAR',
+        currency: 'INR',
         payment_type: form.payment_type as Payment['payment_type'],
         payment_method: form.payment_method as Payment['payment_method'],
         status: 'received',
@@ -159,6 +193,11 @@ export default function PaymentsPage() {
         created_at: now,
         updated_at: now,
       }
+
+      try {
+        await (supabase as any).from('payments').insert([newP])
+      } catch (_) {}
+
       setPayments(prev => [newP, ...prev])
       toast.success('Payment recorded')
     }
@@ -275,13 +314,13 @@ export default function PaymentsPage() {
                   <td colSpan={9} className="text-center py-12 text-slate-500">No payments found</td>
                 </tr>
               ) : filtered.map(p => {
-                const client = demoClients.find(c => c.id === p.client_id)
-                const project = demoProjects.find(pr => pr.id === p.project_id)
+                const client = clients.find(c => c.id === p.client_id)
+                const project = projects.find(pr => pr.id === p.project_id)
                 return (
                   <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="px-4 py-3 font-mono text-blue-400 font-medium">{p.reference}</td>
                     <td className="px-4 py-3">
-                      <div className="text-slate-200 font-medium">{client?.company ?? '—'}</div>
+                      <div className="text-slate-200 font-medium">{client?.business_name ?? client?.company ?? client?.name ?? '—'}</div>
                       <div className="text-slate-500 text-xs">{client?.name}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-400">{project?.name ?? '—'}</td>
@@ -300,6 +339,13 @@ export default function PaymentsPage() {
                     <td className="px-4 py-3 text-slate-400">{formatDate(p.received_date)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => downloadReceiptPDF(p, client)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                          title="Download PDF Receipt"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => setViewPayment(p)}
                           className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
@@ -337,8 +383,8 @@ export default function PaymentsPage() {
             </div>
             <div className="p-6 space-y-4 text-sm">
               {[
-                ['Client', demoClients.find(c => c.id === viewPayment.client_id)?.company ?? '—'],
-                ['Project', demoProjects.find(pr => pr.id === viewPayment.project_id)?.name ?? '—'],
+                ['Client', clients.find(c => c.id === viewPayment.client_id)?.business_name ?? clients.find(c => c.id === viewPayment.client_id)?.company ?? clients.find(c => c.id === viewPayment.client_id)?.name ?? '—'],
+                ['Project', projects.find(pr => pr.id === viewPayment.project_id)?.name ?? '—'],
                 ['Amount', formatCurrency(viewPayment.amount)],
                 ['Type', TYPE_LABEL[viewPayment.payment_type] ?? viewPayment.payment_type],
                 ['Method', METHOD_LABEL[viewPayment.payment_method] ?? viewPayment.payment_method],
@@ -356,6 +402,14 @@ export default function PaymentsPage() {
                   <p className="text-slate-300">{viewPayment.notes}</p>
                 </div>
               )}
+              <div className="pt-2">
+                <button
+                  onClick={() => downloadReceiptPDF(viewPayment, clients.find(c => c.id === viewPayment.client_id))}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Download className="w-4 h-4" /> Download PDF Receipt
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -379,7 +433,7 @@ export default function PaymentsPage() {
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select client...</option>
-                    {demoClients.map(c => <option key={c.id} value={c.id}>{c.company}</option>)}
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.business_name || c.company || c.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -390,7 +444,7 @@ export default function PaymentsPage() {
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">None</option>
-                    {demoProjects.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
+                    {projects.map(pr => <option key={pr.id} value={pr.id}>{pr.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -405,7 +459,7 @@ export default function PaymentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Amount (ZAR) *</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Amount (₹) *</label>
                   <input
                     type="number"
                     min={0}

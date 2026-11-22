@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
-import { demoAgreements, demoClients, demoQuotations } from '../data/demoData'
 import { supabase } from '../lib/supabase'
 import {
   openPrintableAgreement,
@@ -47,9 +46,9 @@ const STATUS_CONFIG: Record<AgreementStatus, { label: string; badge: string; dot
 }
 
 export default function AgreementsPage() {
-  const [agreements, setAgreements] = useState<Agreement[]>(demoAgreements)
-  const [clients, setClients] = useState<Client[]>(demoClients)
-  const [quotations, setQuotations] = useState<Quotation[]>(demoQuotations)
+  const [agreements, setAgreements] = useState<Agreement[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [quotations, setQuotations] = useState<Quotation[]>([])
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -104,17 +103,17 @@ export default function AgreementsPage() {
           .from('agreements')
           .select('*')
           .order('created_at', { ascending: false })
-        if (!agrErr && agrData && agrData.length > 0) {
+        if (!agrErr && agrData) {
           setAgreements(agrData)
         }
 
         const { data: cData } = await (supabase as any).from('clients').select('*')
-        if (cData && cData.length > 0) setClients(cData)
+        if (cData) setClients(cData)
 
         const { data: qData } = await (supabase as any).from('quotations').select('*')
-        if (qData && qData.length > 0) setQuotations(qData)
+        if (qData) setQuotations(qData)
       } catch (err) {
-        console.warn('Using demo data fallback for agreements:', err)
+        console.error('Failed to load agreements from Supabase:', err)
       }
     }
     loadData()

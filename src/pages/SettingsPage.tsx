@@ -74,38 +74,27 @@ interface Session {
   current: boolean;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Real Administrative Data ────────────────────────────────────────────────
 
 const MOCK_MEMBERS: TeamMember[] = [
-  { id: '1', name: 'Alice Johnson', email: 'alice@capesecure.io', role: 'Admin', status: 'Active', lastLogin: '2026-11-21 10:32' },
-  { id: '2', name: 'Bob Marley', email: 'bob@capesecure.io', role: 'Manager', status: 'Active', lastLogin: '2026-11-20 16:45' },
-  { id: '3', name: 'Carol White', email: 'carol@capesecure.io', role: 'Viewer', status: 'Invited', lastLogin: '—' },
-  { id: '4', name: 'David Kim', email: 'david@capesecure.io', role: 'Manager', status: 'Active', lastLogin: '2026-11-19 09:12' },
-  { id: '5', name: 'Eva Nkosi', email: 'eva@capesecure.io', role: 'Viewer', status: 'Disabled', lastLogin: '2026-10-30 14:00' },
+  { id: '1', name: 'Libinesh', email: 'libinesh@capesecure.com', role: 'Super Admin', status: 'Active', lastLogin: 'Now' },
+  { id: '2', name: 'Technical Lead', email: 'tech@capesecure.com', role: 'Admin', status: 'Active', lastLogin: '2026-11-21 18:30' },
+  { id: '3', name: 'Finance Lead', email: 'finance@capesecure.com', role: 'Manager', status: 'Active', lastLogin: '2026-11-21 14:15' },
 ];
 
 const MOCK_AUDIT: AuditEntry[] = [
-  { id: '1', timestamp: '2026-11-21 10:32:11', user: 'alice@capesecure.io', action: 'LOGIN', resource: 'Auth', ip: '196.25.1.4' },
-  { id: '2', timestamp: '2026-11-21 10:35:44', user: 'alice@capesecure.io', action: 'UPDATE', resource: 'Building #3', ip: '196.25.1.4' },
-  { id: '3', timestamp: '2026-11-21 10:40:02', user: 'bob@capesecure.io', action: 'LOGIN', resource: 'Auth', ip: '41.0.22.9' },
-  { id: '4', timestamp: '2026-11-21 11:00:17', user: 'bob@capesecure.io', action: 'CREATE', resource: 'Lease #102', ip: '41.0.22.9' },
-  { id: '5', timestamp: '2026-11-21 11:15:33', user: 'alice@capesecure.io', action: 'DELETE', resource: 'Invoice #445', ip: '196.25.1.4' },
-  { id: '6', timestamp: '2026-11-20 16:45:00', user: 'david@capesecure.io', action: 'LOGIN', resource: 'Auth', ip: '102.89.44.5' },
-  { id: '7', timestamp: '2026-11-20 16:50:22', user: 'david@capesecure.io', action: 'VIEW', resource: 'Report: Revenue', ip: '102.89.44.5' },
-  { id: '8', timestamp: '2026-11-20 17:05:11', user: 'alice@capesecure.io', action: 'UPDATE', resource: 'Settings', ip: '196.25.1.4' },
-  { id: '9', timestamp: '2026-11-19 09:12:55', user: 'david@capesecure.io', action: 'LOGIN', resource: 'Auth', ip: '102.89.44.5' },
-  { id: '10', timestamp: '2026-11-19 09:20:00', user: 'alice@capesecure.io', action: 'INVITE', resource: 'User: carol@capesecure.io', ip: '196.25.1.4' },
+  { id: '1', timestamp: '2026-11-21 21:30:11', user: 'libinesh@capesecure.com', action: 'LOGIN', resource: 'Supabase Auth', ip: '127.0.0.1' },
+  { id: '2', timestamp: '2026-11-21 21:35:44', user: 'libinesh@capesecure.com', action: 'CREATE', resource: 'Agreement Management (Phase 5)', ip: '127.0.0.1' },
+  { id: '3', timestamp: '2026-11-21 21:40:02', user: 'libinesh@capesecure.com', action: 'UPDATE', resource: 'Email Service (Brevo API)', ip: '127.0.0.1' },
 ];
 
 const MOCK_SESSIONS: Session[] = [
-  { id: '1', device: 'Chrome on Windows 11', location: 'Cape Town, ZA', lastActive: 'Now', current: true },
-  { id: '2', device: 'Safari on iPhone 15', location: 'Johannesburg, ZA', lastActive: '2 hours ago', current: false },
-  { id: '3', device: 'Firefox on macOS', location: 'London, UK', lastActive: 'Yesterday', current: false },
+  { id: '1', device: 'Chrome on Windows', location: 'India (Current Session)', lastActive: 'Now', current: true },
 ];
 
 const MOCK_API_KEYS: ApiKey[] = [
-  { id: '1', name: 'Production Key', key: 'cs_live_••••••••••••••••3f9a', created: '2026-10-01' },
-  { id: '2', name: 'Development Key', key: 'cs_test_••••••••••••••••7b2c', created: '2026-11-10' },
+  { id: '1', name: 'Brevo SMTP Live API Key', key: 'xkeysib-••••••••••••••••GLv', created: '2026-11-21' },
+  { id: '2', name: 'Supabase Database Anon Key', key: 'sb_publishable_••••••••••••••••OLR1', created: '2026-11-21' },
 ];
 
 // ─── Sidebar Nav ──────────────────────────────────────────────────────────────
@@ -180,8 +169,8 @@ const SaveButton: React.FC<{ onClick: () => void; label?: string }> = ({ onClick
 const GeneralSection: React.FC = () => {
   const [form, setForm] = useState({
     appName: 'CapeSecure BMS',
-    timezone: 'Africa/Johannesburg',
-    currency: 'ZAR',
+    timezone: 'Asia/Kolkata',
+    currency: 'INR',
     dateFormat: 'DD/MM/YYYY',
     language: 'en',
   });
@@ -198,7 +187,7 @@ const GeneralSection: React.FC = () => {
         </FormField>
         <FormField label="Timezone" htmlFor="timezone">
           <select id="timezone" className={selectCls} value={form.timezone} onChange={set('timezone')}>
-            <option value="Africa/Johannesburg">Africa/Johannesburg (UTC+2)</option>
+            <option value="Asia/Kolkata">Asia/Kolkata (IST, UTC+5:30)</option>
             <option value="UTC">UTC</option>
             <option value="America/New_York">America/New_York (UTC-5)</option>
             <option value="Europe/London">Europe/London (UTC+0)</option>
@@ -207,11 +196,11 @@ const GeneralSection: React.FC = () => {
         </FormField>
         <FormField label="Currency" htmlFor="currency">
           <select id="currency" className={selectCls} value={form.currency} onChange={set('currency')}>
-            <option value="ZAR">ZAR — South African Rand</option>
-            <option value="USD">USD — US Dollar</option>
-            <option value="EUR">EUR — Euro</option>
-            <option value="GBP">GBP — British Pound</option>
-            <option value="NAD">NAD — Namibian Dollar</option>
+            <option value="INR">INR — Indian Rupee (₹)</option>
+            <option value="USD">USD — US Dollar ($)</option>
+            <option value="EUR">EUR — Euro (€)</option>
+            <option value="GBP">GBP — British Pound (£)</option>
+            <option value="AED">AED — UAE Dirham</option>
           </select>
         </FormField>
         <FormField label="Date Format" htmlFor="dateFormat">
@@ -241,11 +230,11 @@ const GeneralSection: React.FC = () => {
 
 const CompanySection: React.FC = () => {
   const [form, setForm] = useState({
-    companyName: 'CapeSecure Property Management',
-    email: 'info@capesecure.io',
-    phone: '+27 21 000 0000',
-    address: '1 Adderley Street\nCape Town\n8001',
-    website: 'https://capesecure.io',
+    companyName: 'CapeSecure Solutions',
+    email: 'contact@capesecure.com',
+    phone: '+91 94892 23812',
+    address: 'CapeSecure HQ, Kerala, India',
+    website: 'https://capesecure.vercel.app',
   });
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>

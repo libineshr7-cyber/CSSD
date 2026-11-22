@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import {
   CheckSquare,
@@ -12,8 +12,9 @@ import {
   Calendar,
   Globe,
 } from 'lucide-react'
-import { demoProjects, demoClients } from '../data/demoData'
+import { supabase } from '../lib/supabase'
 import { formatDate } from '../lib/utils'
+import type { Project, Client } from '../types/database'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,23 +51,6 @@ const CHECKLIST_TEMPLATE: Omit<ChecklistItem, 'checked'>[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildInitialHandovers(): Record<string, HandoverRecord> {
-  const eligibleProjects = demoProjects.filter(p =>
-    ['review', 'testing', 'deployment'].includes(p.status)
-  )
-  const result: Record<string, HandoverRecord> = {}
-  eligibleProjects.forEach(p => {
-    result[p.id] = {
-      projectId: p.id,
-      status: 'pending',
-      completionDate: p.deadline ?? new Date().toISOString(),
-      expanded: false,
-      items: CHECKLIST_TEMPLATE.map(t => ({ ...t, checked: false })),
-    }
-  })
-  return result
-}
-
 function deriveStatus(items: ChecklistItem[]): HandoverStatus {
   const checked = items.filter(i => i.checked).length
   if (checked === 0) return 'pending'
@@ -93,10 +77,45 @@ function StatusBadge({ status }: { status: HandoverStatus }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function HandoverPage() {
-  const [handovers, setHandovers] = useState<Record<string, HandoverRecord>>(buildInitialHandovers)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [handovers, setHandovers] = useState<Record<string, HandoverRecord>>({})
 
-  const eligibleProjects = demoProjects.filter(p =>
-    ['review', 'testing', 'deployment'].includes(p.status)
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [
+          { data: pData },
+          { data: cData },
+        ] = await Promise.all([
+          (supabase as any).from('projects').select('*').order('created_at', { ascending: false }),
+          (supabase as any).from('clients').select('*'),
+        ])
+        if (pData) {
+          setProjects(pData)
+          const eligible = (pData as Project[]).filter(p =>
+            ['review', 'testing', 'deployment', 'in_progress', 'completed'].includes(p.status)
+          )
+          const initial: Record<string, HandoverRecord> = {}
+          eligible.forEach(p => {
+            initial[p.id] = {
+              projectId: p.id,
+              status: 'pending',
+              completionDate: p.deadline ?? new Date().toISOString(),
+              expanded: false,
+              items: CHECKLIST_TEMPLATE.map(t => ({ ...t, checked: false })),
+            }
+          })
+          setHandovers(initial)
+        }
+        if (cData) setClients(cData)
+      } catch (_) {}
+    }
+    loadData()
+  }, [])
+
+  const eligibleProjects = projects.filter(p =>
+    ['review', 'testing', 'deployment', 'in_progress', 'completed'].includes(p.status)
   )
 
   function toggleItem(projectId: string, itemId: string) {
@@ -173,7 +192,7 @@ export default function HandoverPage() {
       ) : (
         <div className="space-y-4">
           {eligibleProjects.map(project => {
-            const client = demoClients.find(c => c.id === project.client_id)
+            const client = clients.find(c => c.id === project.client_id)
             const handover = handovers[project.id]
             if (!handover) return null
             const checkedCount = handover.items.filter(i => i.checked).length

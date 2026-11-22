@@ -42,24 +42,11 @@ interface RenewalItem {
   renewalDate: string
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Real Baseline ────────────────────────────────────────────────────────────
 
-const INITIAL_PLANS: MaintenancePlan[] = [
-  { id: 'mp-001', client: 'Apex Financial', website: 'apexfin.co.za', planType: 'Premium', monthlyCost: 2500, startDate: '2026-02-01', renewalDate: '2027-02-01', status: 'active' },
-  { id: 'mp-002', client: 'StyleHaus Fashion', website: 'stylehaus.co.za', planType: 'Standard', monthlyCost: 1500, startDate: '2026-05-15', renewalDate: '2027-05-15', status: 'active' },
-  { id: 'mp-003', client: 'Horizon Health Clinic', website: 'horizonhealth.co.za', planType: 'Premium', monthlyCost: 3000, startDate: '2025-12-01', renewalDate: '2026-12-01', status: 'expiring' },
-  { id: 'mp-004', client: 'Pinnacle Properties', website: 'pinnacleprops.co.za', planType: 'Basic', monthlyCost: 800, startDate: '2025-10-01', renewalDate: '2026-10-01', status: 'expired' },
-  { id: 'mp-005', client: 'Cape Craft Brews', website: 'capebrews.co.za', planType: 'Basic', monthlyCost: 800, startDate: '2026-08-01', renewalDate: '2027-08-01', status: 'active' },
-  { id: 'mp-006', client: 'Luxe Brides', website: 'luxebrides.co.za', planType: 'Standard', monthlyCost: 1200, startDate: '2026-01-20', renewalDate: '2026-12-05', status: 'expiring' },
-]
+const INITIAL_PLANS: MaintenancePlan[] = []
 
-const INITIAL_RENEWALS: RenewalItem[] = [
-  { id: 'rn-001', website: 'horizonhealth.co.za', client: 'Horizon Health', renewalType: 'maintenance', cost: 3000, renewalDate: '2026-12-01' },
-  { id: 'rn-002', website: 'luxebrides.co.za', client: 'Luxe Brides', renewalType: 'domain', cost: 350, renewalDate: '2026-12-05' },
-  { id: 'rn-003', website: 'apexfin.co.za', client: 'Apex Financial', renewalType: 'hosting', cost: 1200, renewalDate: '2027-01-15' },
-  { id: 'rn-004', website: 'stylehaus.co.za', client: 'StyleHaus Fashion', renewalType: 'hosting', cost: 950, renewalDate: '2027-02-10' },
-  { id: 'rn-005', website: 'capebrews.co.za', client: 'Cape Craft Brews', renewalType: 'domain', cost: 350, renewalDate: '2027-03-01' },
-]
+const INITIAL_RENEWALS: RenewalItem[] = []
 
 const PLAN_COLORS: Record<PlanType, string> = {
   Basic: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
@@ -149,9 +136,9 @@ function AddPlanModal({ onClose, onAdd }: AddPlanModalProps) {
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {[
-            { label: 'Client Name *', key: 'client', type: 'text', placeholder: 'e.g. Apex Financial' },
-            { label: 'Website URL *', key: 'website', type: 'text', placeholder: 'e.g. example.co.za' },
-            { label: 'Monthly Cost (ZAR)', key: 'monthlyCost', type: 'number', placeholder: '0.00' },
+            { label: 'Client Name *', key: 'client', type: 'text', placeholder: 'e.g. Acme Corporation' },
+            { label: 'Website URL *', key: 'website', type: 'text', placeholder: 'e.g. acme.com' },
+            { label: 'Monthly Cost (₹)', key: 'monthlyCost', type: 'number', placeholder: '0.00' },
             { label: 'Start Date *', key: 'startDate', type: 'date', placeholder: '' },
           ].map(f => (
             <div key={f.key}>

@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Rocket, CheckCircle2, XCircle, Clock, ExternalLink,
   Plus, Terminal, RotateCcw, AlertTriangle, GitBranch, Globe
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '../lib/utils'
-import { demoProjects } from '../data/demoData'
+import { supabase } from '../lib/supabase'
+import type { Project } from '../types/database'
 
 interface DeploymentRecord {
   id: string
@@ -22,97 +23,34 @@ interface DeploymentRecord {
   logs: string[]
 }
 
-const INITIAL_DEPLOYMENTS: DeploymentRecord[] = [
-  {
-    id: 'DEP-8842',
-    projectId: 'proj-001',
-    environment: 'production',
-    branch: 'main',
-    commitHash: '7f9a2b1',
-    commitMsg: 'feat: add Apex Financial multi-currency transaction export',
-    status: 'success',
-    url: 'https://apexfin.co.za',
-    deployedBy: 'CapeSecure DevOps',
-    deployedAt: '2026-11-20T14:30:00Z',
-    duration: '42s',
-    logs: [
-      '[14:29:18] Cloning git repository...',
-      '[14:29:22] Installing npm dependencies with cache...',
-      '[14:29:35] Building production bundle: vite build --minify',
-      '[14:29:50] Uploading build assets to Vercel CDN Edge Network...',
-      '[14:30:00] Health check HTTP 200 OK: https://apexfin.co.za',
-      '[14:30:00] Deployment complete in 42 seconds.'
-    ]
-  },
-  {
-    id: 'DEP-8841',
-    projectId: 'proj-002',
-    environment: 'staging',
-    branch: 'feat/checkout',
-    commitHash: '3a1c8d4',
-    commitMsg: 'fix: PayFast redirect URL parameters',
-    status: 'success',
-    url: 'https://staging.stylehaus.co.za',
-    deployedBy: 'CapeSecure DevOps',
-    deployedAt: '2026-11-20T11:15:00Z',
-    duration: '38s',
-    logs: [
-      '[11:14:22] Triggered from GitHub push to feat/checkout',
-      '[11:14:35] Running TypeScript compiler checks...',
-      '[11:14:48] Running Vitest functional test suite (14 passed)',
-      '[11:15:00] Deployed to staging edge preview.'
-    ]
-  },
-  {
-    id: 'DEP-8840',
-    projectId: 'proj-003',
-    environment: 'production',
-    branch: 'release/v1.2',
-    commitHash: '9d2e4f0',
-    commitMsg: 'perf: patient records query indexing and cache optimization',
-    status: 'success',
-    url: 'https://horizonhealth.co.za',
-    deployedBy: 'CapeSecure DevOps',
-    deployedAt: '2026-11-19T18:00:00Z',
-    duration: '51s',
-    logs: [
-      '[17:59:10] Pre-flight security scans clean',
-      '[17:59:30] Database migration 004 applied successfully',
-      '[18:00:00] Zero-downtime deployment finished.'
-    ]
-  },
-  {
-    id: 'DEP-8839',
-    projectId: 'proj-002',
-    environment: 'production',
-    branch: 'main',
-    commitHash: '1c4e7b8',
-    commitMsg: 'style: update winter collection promotional hero banners',
-    status: 'rolled_back',
-    url: 'https://stylehaus.co.za',
-    deployedBy: 'CapeSecure DevOps',
-    deployedAt: '2026-11-18T09:45:00Z',
-    duration: '1m 12s',
-    logs: [
-      '[09:44:00] Initiating instant rollback to snapshot DEP-8837',
-      '[09:44:45] Traffic shifted back to stable build',
-      '[09:45:00] Rollback complete. Alert sent to design lead.'
-    ]
-  }
-]
+const INITIAL_DEPLOYMENTS: DeploymentRecord[] = []
 
 export default function DeploymentsPage() {
   const [deployments, setDeployments] = useState<DeploymentRecord[]>(INITIAL_DEPLOYMENTS)
+  const [projects, setProjects] = useState<Project[]>([])
   const [activeLogModal, setActiveLogModal] = useState<DeploymentRecord | null>(null)
   const [showDeployModal, setShowDeployModal] = useState(false)
 
   // New deploy form
-  const [projectId, setProjectId] = useState(demoProjects[0]?.id || '')
+  const [projectId, setProjectId] = useState('')
   const [env, setEnv] = useState<'production' | 'staging'>('staging')
   const [branch, setBranch] = useState('main')
   const [notes, setNotes] = useState('Production release approved after QA testing')
 
-  const projectMap = useMemo(() => Object.fromEntries(demoProjects.map(p => [p.id, p])), [])
+  useEffect(() => {
+    async function loadProjects() {
+      try {
+        const { data } = await (supabase as any).from('projects').select('*').order('name', { ascending: true })
+        if (data) {
+          setProjects(data as Project[])
+          if (data.length > 0 && !projectId) setProjectId(data[0].id)
+        }
+      } catch (_) {}
+    }
+    loadProjects()
+  }, [])
+
+  const projectMap = useMemo(() => Object.fromEntries(projects.map(p => [p.id, p])), [projects])
 
   const stats = useMemo(() => {
     const total = deployments.length
@@ -133,7 +71,7 @@ export default function DeploymentsPage() {
       commitHash: Math.random().toString(16).substring(2, 9),
       commitMsg: notes,
       status: 'in_progress',
-      url: env === 'production' ? (proj?.website_url || `https://${proj?.name.toLowerCase().replace(/\s+/g, '')}.co.za`) : (proj?.staging_url || 'https://staging.capesecure.co.za'),
+      url: env === 'production' ? (proj?.website_url || `https://${proj?.name.toLowerCase().replace(/\s+/g, '')}.com`) : (proj?.staging_url || 'https://staging.capesecure.vercel.app'),
       deployedBy: 'CapeSecure Admin',
       deployedAt: new Date().toISOString(),
       duration: 'In progress...',
@@ -382,7 +320,8 @@ export default function DeploymentsPage() {
                   onChange={e => setProjectId(e.target.value)}
                   className="input cursor-pointer"
                 >
-                  {demoProjects.map(p => (
+                  <option value="">Select a project...</option>
+                  {projects.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>

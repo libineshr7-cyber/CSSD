@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
-import { demoClients, demoLeads } from '../data/demoData'
 import { supabase } from '../lib/supabase'
 import { openPrintableRequirementSummary, downloadRequirementPDF, downloadRequirementHTML } from '../lib/pdfGenerator'
 import type { Requirement, Client, Lead, RequirementReference, RequirementAttachment } from '../types/database'
@@ -54,82 +53,12 @@ const DEFAULT_FEATURES = [
   'Multi-language Support',
 ]
 
-const INITIAL_REQUIREMENTS: Requirement[] = [
-  {
-    id: 'req-001',
-    client_id: 'client-001',
-    lead_id: 'lead-004',
-    project_id: 'proj-001',
-    title: 'Financial Services Portal & Dashboard',
-    website_type: 'portal_saas',
-    business_purpose: 'Provide enterprise clients real-time financial tracking, portfolio insights, and automated statements with bank-grade security.',
-    pages: ['Home', 'About Us', 'Services', 'User Dashboard', 'Pricing', 'Terms & Privacy'],
-    features: ['User Authentication & Roles', 'Contact Form & Lead Capture', 'Online Payment Gateway', 'SEO Optimization & Meta tags', 'Analytics & Conversion Tracking'],
-    frontend_tech: 'React, TypeScript, Tailwind CSS, Vite, Recharts',
-    backend_tech: 'Node.js, Supabase Edge Functions, REST API',
-    database_tech: 'Supabase PostgreSQL with Row Level Security',
-    payment_gateway: 'Stripe',
-    shipping_integration: 'None',
-    domain_requirements: 'Client will transfer apexfin.co.za to CapeSecure Cloudflare DNS',
-    hosting_requirements: 'Vercel Edge Global Network',
-    reference_websites: [
-      { url: 'https://stripe.com/dashboard', notes: 'Loved the sidebar and analytics charts' },
-      { url: 'https://linear.app', notes: 'Super clean dark mode and typography' },
-    ],
-    design_preferences: 'High-contrast dark theme, crisp typography, clean fintech aesthetic.',
-    reference_urls: ['https://stripe.com/dashboard', 'https://linear.app'],
-    timeline: '8 Weeks',
-    budget_range: 'R 45,000 – R 60,000',
-    budget_min: 45000,
-    budget_max: 60000,
-    estimated_delivery_date: '2027-01-31',
-    additional_notes: 'Must comply with South African POPIA regulations and provide audit logs.',
-    attachments: [
-      { id: 'att-1', name: 'Brand_Guidelines_Apex.pdf', size: 2400000, type: 'pdf', uploaded_at: '2026-11-01T08:00:00Z' },
-    ],
-    status: 'approved',
-    created_at: '2026-11-01T08:00:00Z',
-    updated_at: '2026-11-15T10:00:00Z',
-  },
-  {
-    id: 'req-002',
-    client_id: 'client-002',
-    lead_id: null,
-    project_id: null,
-    title: 'Fashion E-Commerce Flagship Store',
-    website_type: 'e-commerce',
-    business_purpose: 'Direct-to-consumer premium apparel store with automated inventory sync and instant mobile checkout.',
-    pages: ['Home', 'Products / Shop', 'About Us', 'Contact Us', 'FAQ', 'Terms & Privacy'],
-    features: ['Online Payment Gateway', 'Shipping & Courier Integration', 'CMS / Blog Engine', 'SEO Optimization & Meta tags', 'Live Chat / WhatsApp Widget'],
-    frontend_tech: 'React, Tailwind CSS, Framer Motion',
-    backend_tech: 'Node.js & Supabase Database Webhooks',
-    database_tech: 'PostgreSQL',
-    payment_gateway: 'PayFast / Stripe',
-    shipping_integration: 'Shiprocket / Courier Guy',
-    domain_requirements: 'CapeSecure to register stylehaus.co.za',
-    hosting_requirements: 'CapeSecure Managed Cloud',
-    reference_websites: [
-      { url: 'https://asos.com', notes: 'Product card hover effects and checkout UX' }
-    ],
-    design_preferences: 'Minimalist editorial layout, high-res photography focus, elegant serif headings.',
-    reference_urls: ['https://asos.com'],
-    timeline: '6 Weeks',
-    budget_range: 'R 25,000 – R 35,000',
-    budget_min: 25000,
-    budget_max: 35000,
-    estimated_delivery_date: '2026-12-20',
-    additional_notes: 'Include Instagram feed integration and discount coupons.',
-    attachments: [],
-    status: 'reviewed',
-    created_at: '2026-10-20T09:00:00Z',
-    updated_at: '2026-11-05T14:00:00Z',
-  },
-]
+const INITIAL_REQUIREMENTS: Requirement[] = []
 
 export default function RequirementsPage() {
   const [requirements, setRequirements] = useState<Requirement[]>(INITIAL_REQUIREMENTS)
-  const [clients, setClients] = useState<Client[]>(demoClients)
-  const [leads, setLeads] = useState<Lead[]>(demoLeads)
+  const [clients, setClients] = useState<Client[]>([])
+  const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(false)
 
   // Filters & State
@@ -155,16 +84,16 @@ export default function RequirementsPage() {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setRequirements(data as Requirement[])
       }
     } catch (_) {}
 
     try {
       const { data: clientData } = await (supabase as any).from('clients').select('*')
-      if (clientData && clientData.length > 0) setClients(clientData as Client[])
+      if (clientData) setClients(clientData as Client[])
       const { data: leadData } = await (supabase as any).from('leads').select('*')
-      if (leadData && leadData.length > 0) setLeads(leadData as Lead[])
+      if (leadData) setLeads(leadData as Lead[])
     } catch (_) {}
     setLoading(false)
   }
@@ -1110,7 +1039,7 @@ function RequirementFormModal({
           {/* Section 5: Commercials & Dates */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-slate-500 mb-1">Budget Min (ZAR)</label>
+              <label className="block text-slate-500 mb-1">Budget Min (₹)</label>
               <input
                 type="number"
                 placeholder="25000"
@@ -1121,7 +1050,7 @@ function RequirementFormModal({
             </div>
 
             <div>
-              <label className="block text-slate-500 mb-1">Budget Max (ZAR)</label>
+              <label className="block text-slate-500 mb-1">Budget Max (₹)</label>
               <input
                 type="number"
                 placeholder="40000"
