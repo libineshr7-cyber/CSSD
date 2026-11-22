@@ -636,6 +636,115 @@ export interface AuditLog {
   created_at: string
 }
 
+// ─── Phase 8: Testing, Deployment & Handover Types ────────────────────────────
+
+export type QATestStatus = 'passed' | 'failed' | 'pending' | 'skipped'
+
+export interface QATestCase {
+  id: string
+  project_id?: string | null
+  checklist_item: string
+  suite: string
+  test_name: string
+  status: QATestStatus
+  duration_ms: number
+  executed_by: string
+  executed_at: string
+  notes?: string | null
+  created_at: string
+}
+
+export type BugSeverity = 'critical' | 'high' | 'medium' | 'low'
+export type BugStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+
+export interface BugReport {
+  id: string
+  bug_id: string
+  project_id: string
+  title: string
+  description: string
+  screenshot_url?: string | null
+  severity: BugSeverity
+  status: BugStatus
+  assigned_to?: string | null
+  reported_by: string
+  resolution_notes?: string | null
+  resolved_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type DeploymentEnvironment = 'production' | 'staging' | 'preview'
+export type DeploymentStatus = 'success' | 'failed' | 'in_progress' | 'rolled_back'
+export type DNSStatus = 'configured' | 'propagating' | 'pending'
+export type SSLStatus = 'active' | 'pending' | 'expired'
+
+export interface Deployment {
+  id: string
+  deployment_id: string
+  project_id: string
+  domain_name: string
+  domain_registrar: string
+  dns_status: DNSStatus
+  hosting_provider: string
+  frontend_deployment_url: string
+  backend_api_url?: string | null
+  database_configuration?: {
+    cluster?: string
+    engine?: string
+    ssl_enabled?: boolean
+    backups_enabled?: boolean
+  }
+  ssl_status: SSLStatus
+  environment: DeploymentEnvironment
+  deployment_version: string
+  delegated_access_ref?: string
+  status: DeploymentStatus
+  deployed_by: string
+  deployed_at: string
+  build_logs: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface HandoverChecklistItem {
+  id: string
+  label: string
+  category: string
+  checked: boolean
+  verified_by?: string
+  verified_at?: string
+}
+
+export interface ProjectHandover {
+  id: string
+  project_id: string
+  client_id: string
+  live_website_url: string
+  domain_ownership_confirmed: boolean
+  domain_transfer_details?: string | null
+  hosting_information?: string | null
+  database_access_transfer?: string | null
+  admin_dashboard_access?: string | null
+  source_code_transfer?: string | null
+  documentation_urls?: string[]
+  backup_instructions?: string | null
+  maintenance_sla?: string | null
+  outstanding_issues?: string | null
+  checklist_items: HandoverChecklistItem[]
+  status: 'pending' | 'in_progress' | 'completed'
+  agency_signatory_name?: string | null
+  agency_signatory_title?: string | null
+  agency_signed_at?: string | null
+  client_signatory_name?: string | null
+  client_signatory_title?: string | null
+  client_acknowledgement?: string | null
+  client_signed_at?: string | null
+  handover_date: string
+  created_at: string
+  updated_at: string
+}
+
 // ─── UI State Types ───────────────────────────────────────────────────────────
 
 export type NavModule =
