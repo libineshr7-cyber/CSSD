@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
-import { ROLE_LABELS, type AppRole, type NavModule } from '../types/database';
+import { ROLE_LABELS, type AppRole, type NavModule, type AutomationRule, type EmailLog } from '../types/database';
 import { DEFAULT_ROLE_PERMISSIONS } from '../lib/permissions';
-import { sendTestEmail, getBrevoApiKey, getSenderEmail, getSenderName } from '../lib/emailService';
+import { sendTestEmail, getBrevoApiKey, getSenderEmail, getSenderName, resendEmailLog } from '../lib/emailService';
+import { supabase } from '../lib/supabase';
+import { formatDate } from '../lib/utils';
 import {
   Settings,
   Building2,
@@ -26,6 +28,13 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
+  Send,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  Filter,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -419,15 +428,103 @@ const TeamSection: React.FC = () => {
   );
 };
 
-// ─── Email Configuration Section (Brevo Integration) ──────────────────────────
+// ─── Email & Business Automation Suite (Phase 11) ─────────────────────────────
 
 const EmailSection: React.FC = () => {
+  const [subTab, setSubTab] = useState<'config' | 'rules' | 'outbox'>('config');
   const [brevoKey, setBrevoKey] = useState(getBrevoApiKey());
   const [senderEmail, setSenderEmail] = useState(getSenderEmail());
   const [senderName, setSenderName] = useState(getSenderName());
   const [showKey, setShowKey] = useState(false);
   const [testEmailAddress, setTestEmailAddress] = useState('');
   const [testing, setTesting] = useState(false);
+
+  // Automation Rules & Outbox State
+  const [rules, setRules] = useState<AutomationRule[]>([]);
+  const [ruleCategory, setRuleCategory] = useState<string>('all');
+  const [outboxLogs, setOutboxLogs] = useState<EmailLog[]>([]);
+  const [outboxStatusFilter, setOutboxStatusFilter] = useState<string>('all');
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchRules();
+    fetchOutbox();
+  }, []);
+
+  const fetchRules = async () => {
+    try {
+      const { data } = await (supabase as any)
+        .from('automation_rules')
+        .select('*')
+        .order('category', { ascending: true });
+      if (data && data.length > 0) {
+        setRules(data);
+      }
+    } catch (_) {}
+  };
+
+  const fetchOutbox = async () => {
+    setLoadingLogs(true);
+    try {
+      const { data } = await (supabase as any)
+        .from('email_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (data) {
+        setOutboxLogs(data);
+      }
+    } catch (_) {}
+    finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const handleToggleRule = async (ruleId: string, currentVal: boolean) => {
+    const nextVal = !currentVal;
+    try {
+      await (supabase as any)
+        .from('automation_rules')
+        .update({ is_enabled: nextVal, updated_at: new Date().toISOString() })
+        .eq('id', ruleId);
+      setRules(prev => prev.map(r => r.id === ruleId ? { ...r, is_enabled: nextVal } : r));
+      toast.success(`Rule updated.`);
+    } catch (err: any) {
+      toast.error('Failed to update rule: ' + err.message);
+    }
+  };
+
+  const handleUpdateDelay = async (ruleId: string, delayDays: number) => {
+    try {
+      await (supabase as any)
+        .from('automation_rules')
+        .update({ delay_days: delayDays, updated_at: new Date().toISOString() })
+        .eq('id', ruleId);
+      setRules(prev => prev.map(r => r.id === ruleId ? { ...r, delay_days: delayDays } : r));
+      toast.success('Reminder delay updated.');
+    } catch (err: any) {
+      toast.error('Failed to update reminder delay: ' + err.message);
+    }
+  };
+
+  const handleResend = async (logId: string) => {
+    setResendingId(logId);
+    toast.loading('Re-dispatching transactional email via Brevo...', { id: 'resend' });
+    try {
+      const res = await resendEmailLog(logId);
+      if (res.success) {
+        toast.success('Email re-sent successfully!', { id: 'resend' });
+        fetchOutbox();
+      } else {
+        toast.error('Failed to re-send: ' + (res.error || 'Unknown error'), { id: 'resend' });
+      }
+    } catch (err: any) {
+      toast.error('Resend error: ' + err.message, { id: 'resend' });
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const handleSave = () => {
     localStorage.setItem('capesecure_brevo_api_key', brevoKey.trim());
@@ -446,7 +543,6 @@ const EmailSection: React.FC = () => {
     const toastId = toast.loading(`Sending test email to ${testEmailAddress}...`);
 
     try {
-      // Save current key first
       localStorage.setItem('capesecure_brevo_api_key', brevoKey.trim());
       localStorage.setItem('capesecure_brevo_sender_email', senderEmail.trim());
       localStorage.setItem('capesecure_brevo_sender_name', senderName.trim());
@@ -454,6 +550,7 @@ const EmailSection: React.FC = () => {
       const res = await sendTestEmail(testEmailAddress.trim());
       if (res.success) {
         toast.success(`Test email sent successfully via Brevo! (ID: ${res.messageId?.slice(0, 10)}...)`, { id: toastId });
+        fetchOutbox();
       } else {
         toast.error(`Brevo dispatch error: ${res.error || 'Check API key or sender email verification.'}`, { id: toastId });
       }
@@ -464,95 +561,342 @@ const EmailSection: React.FC = () => {
     }
   };
 
+  const filteredRules = rules.filter(r => {
+    if (ruleCategory === 'all') return true;
+    return r.category === ruleCategory;
+  });
+
+  const filteredLogs = outboxLogs.filter(l => {
+    if (outboxStatusFilter === 'all') return true;
+    return l.delivery_status === outboxStatusFilter;
+  });
+
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-4xl">
       <SectionTitle
-        title="Email & Transactional Dispatch (Brevo)"
-        subtitle="Manage transactional email infrastructure for quotations, service agreements, and invoices."
+        title="Email & Business Automation Suite"
+        subtitle="Manage Brevo transactional infrastructure, automated lifecycle event triggers, and verified delivery outbox."
       />
 
-      <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 space-y-1">
-        <div className="font-bold flex items-center gap-1.5">
-          <Mail className="w-4 h-4" /> Brevo (Sendinblue) Transactional API Connected
-        </div>
-        <p className="text-slate-400">
-          Emails for quotations, client agreements, and invoices are automatically delivered via Brevo SMTP API.
-        </p>
+      {/* Sub-Tabs Navigation */}
+      <div className="flex items-center gap-2 border-b border-gray-200 dark:border-[#333333] pb-2 text-xs font-semibold">
+        <button
+          onClick={() => setSubTab('config')}
+          className={`px-3 py-1.5 rounded-lg transition-colors ${
+            subTab === 'config'
+              ? 'bg-[#0D99FF] text-white shadow-xs'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-[#282828]'
+          }`}
+        >
+          Provider Configuration
+        </button>
+        <button
+          onClick={() => setSubTab('rules')}
+          className={`px-3 py-1.5 rounded-lg transition-colors ${
+            subTab === 'rules'
+              ? 'bg-[#0D99FF] text-white shadow-xs'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-[#282828]'
+          }`}
+        >
+          Automated Event Rules ({rules.length})
+        </button>
+        <button
+          onClick={() => setSubTab('outbox')}
+          className={`px-3 py-1.5 rounded-lg transition-colors ${
+            subTab === 'outbox'
+              ? 'bg-[#0D99FF] text-white shadow-xs'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-[#282828]'
+          }`}
+        >
+          Email Outbox & Delivery Logs ({outboxLogs.length})
+        </button>
       </div>
 
-      <div className="space-y-4">
-        <FormField label="Brevo API Key (v3)" htmlFor="brevoApiKey">
-          <div className="relative">
-            <input
-              id="brevoApiKey"
-              type={showKey ? 'text' : 'password'}
-              className={`${inputCls} pr-10 font-mono text-xs`}
-              value={brevoKey}
-              onChange={e => setBrevoKey(e.target.value)}
-              placeholder="xkeysib-..."
-            />
-            <button
-              type="button"
-              onClick={() => setShowKey(s => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-            >
-              {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
+      {/* ── SUB-TAB 1: CONFIG ── */}
+      {subTab === 'config' && (
+        <div className="space-y-6 max-w-2xl">
+          <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 space-y-1">
+            <div className="font-bold flex items-center gap-1.5">
+              <Mail className="w-4 h-4" /> Brevo (Sendinblue) Transactional API Connected
+            </div>
+            <p className="text-slate-400">
+              Emails for proposals, agreements, invoices, receipts, project status, and downtime alerts are automatically dispatched via Brevo SMTP API.
+            </p>
           </div>
-        </FormField>
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Sender Name" htmlFor="senderName">
-            <input
-              id="senderName"
-              className={inputCls}
-              value={senderName}
-              onChange={e => setSenderName(e.target.value)}
-              placeholder="CapeSecure Solutions"
-            />
-          </FormField>
+          <div className="space-y-4">
+            <FormField label="Brevo API Key (v3)" htmlFor="brevoApiKey">
+              <div className="relative">
+                <input
+                  id="brevoApiKey"
+                  type={showKey ? 'text' : 'password'}
+                  className={`${inputCls} pr-10 font-mono text-xs`}
+                  value={brevoKey}
+                  onChange={e => setBrevoKey(e.target.value)}
+                  placeholder="xkeysib-..."
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </FormField>
 
-          <FormField label="Verified Sender Email" htmlFor="senderEmail">
-            <input
-              id="senderEmail"
-              type="email"
-              className={inputCls}
-              value={senderEmail}
-              onChange={e => setSenderEmail(e.target.value)}
-              placeholder="contact@capesecure.com"
-            />
-          </FormField>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Sender Name" htmlFor="senderName">
+                <input
+                  id="senderName"
+                  className={inputCls}
+                  value={senderName}
+                  onChange={e => setSenderName(e.target.value)}
+                  placeholder="CapeSecure Solutions"
+                />
+              </FormField>
+
+              <FormField label="Verified Sender Email" htmlFor="senderEmail">
+                <input
+                  id="senderEmail"
+                  type="email"
+                  className={inputCls}
+                  value={senderEmail}
+                  onChange={e => setSenderEmail(e.target.value)}
+                  placeholder="contact@capesecure.com"
+                />
+              </FormField>
+            </div>
+
+            <div className="pt-2">
+              <SaveButton onClick={handleSave} />
+            </div>
+          </div>
+
+          {/* Live Test Email Section */}
+          <div className="p-5 bg-white dark:bg-[#1E1E1E] rounded-xl border border-gray-200 dark:border-[#383838] space-y-3">
+            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+              Verify Brevo Dispatch with Test Email
+            </h4>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                placeholder="Enter your email to receive a test message..."
+                value={testEmailAddress}
+                onChange={e => setTestEmailAddress(e.target.value)}
+                className="flex-1 px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-gray-200 dark:border-[#383838] rounded-lg text-xs"
+              />
+              <button
+                type="button"
+                disabled={testing}
+                onClick={handleTestEmail}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${testing ? 'animate-spin' : ''}`} />
+                {testing ? 'Sending...' : 'Send Test'}
+              </button>
+            </div>
+          </div>
         </div>
+      )}
 
-        <div className="pt-2">
-          <SaveButton onClick={handleSave} />
-        </div>
-      </div>
+      {/* ── SUB-TAB 2: AUTOMATION EVENT RULES ── */}
+      {subTab === 'rules' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Configure and toggle all 30 automated lifecycle events across leads, proposals, billing, and maintenance.
+            </p>
+          </div>
 
-      {/* Live Test Email Section */}
-      <div className="p-5 bg-white dark:bg-[#1E1E1E] rounded-xl border border-gray-200 dark:border-[#383838] space-y-3">
-        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-          Verify Brevo Dispatch with Test Email
-        </h4>
-        <div className="flex gap-2">
-          <input
-            type="email"
-            placeholder="Enter your email to receive a test message..."
-            value={testEmailAddress}
-            onChange={e => setTestEmailAddress(e.target.value)}
-            className="flex-1 px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-gray-200 dark:border-[#383838] rounded-lg text-xs"
-          />
-          <button
-            type="button"
-            disabled={testing}
-            onClick={handleTestEmail}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${testing ? 'animate-spin' : ''}`} />
-            {testing ? 'Sending...' : 'Send Test'}
-          </button>
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {['all', 'lead', 'quotation', 'agreement', 'payment', 'project', 'handover', 'maintenance'].map(cat => (
+              <button
+                key={cat}
+                onClick={() => setRuleCategory(cat)}
+                className={`px-3 py-1 rounded-lg font-semibold uppercase text-[10px] tracking-wider transition-colors ${
+                  ruleCategory === cat
+                    ? 'bg-[#0D99FF] text-white'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-[#252525]'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="divide-y divide-gray-200 dark:divide-[#2e2e2e] border border-gray-200 dark:border-[#383838] rounded-2xl bg-white dark:bg-[#202020] overflow-hidden">
+            {filteredRules.map(rule => (
+              <div key={rule.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      {rule.event_name}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.2 rounded-full bg-slate-100 dark:bg-[#282828] text-slate-500">
+                      {rule.category}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      Recipient: {rule.recipient_type}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{rule.description}</p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {rule.delay_days !== undefined && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Delay:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={rule.delay_days}
+                        onChange={e => handleUpdateDelay(rule.id, Number(e.target.value))}
+                        className="w-12 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#282828] border border-slate-300 dark:border-[#383838] text-xs text-center"
+                      />
+                      <span>days</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleRule(rule.id, rule.is_enabled)}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+                      rule.is_enabled ? 'bg-[#0ACF83]' : 'bg-slate-300 dark:bg-[#383838]'
+                    }`}
+                  >
+                    <div
+                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                        rule.is_enabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── SUB-TAB 3: EMAIL OUTBOX & DELIVERY AUDIT LOGS ── */}
+      {subTab === 'outbox' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Email Delivery Audit Trail</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Verified delivery status tracking. Never reported as delivered unless confirmed by provider.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={outboxStatusFilter}
+                onChange={e => setOutboxStatusFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#202020] border border-slate-200 dark:border-[#383838] text-xs text-slate-700 dark:text-slate-300 outline-none"
+              >
+                <option value="all">All Statuses</option>
+                <option value="sent">Sent</option>
+                <option value="delivered">Delivered</option>
+                <option value="failed">Failed / Bounced</option>
+                <option value="queued">Queued</option>
+              </select>
+
+              <button
+                onClick={fetchOutbox}
+                title="Refresh Outbox"
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-[#252525] border border-slate-200 dark:border-[#383838] text-slate-600 dark:text-slate-300"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingLogs ? 'animate-spin text-[#0D99FF]' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {filteredLogs.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-white dark:bg-[#202020] border border-slate-200 dark:border-[#383838]">
+              <Mail className="w-10 h-10 text-slate-400 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No emails on record</p>
+              <p className="text-xs text-slate-400 mt-1">Dispatched proposals, invoices, and alerts will appear in this audit log.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-[#383838] bg-white dark:bg-[#202020]">
+              <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                <thead className="bg-slate-50 dark:bg-[#252525] text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-[#383838]">
+                  <tr>
+                    <th className="py-3 px-4">Recipient</th>
+                    <th className="py-3 px-4">Subject & Event</th>
+                    <th className="py-3 px-4">Delivery Status</th>
+                    <th className="py-3 px-4">Dispatched At</th>
+                    <th className="py-3 px-4">Attempts</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-[#2d2d2d]">
+                  {filteredLogs.map(log => (
+                    <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-[#252525]/50 transition-colors">
+                      <td className="py-3 px-4">
+                        <span className="font-bold text-slate-900 dark:text-white block truncate max-w-[180px]">
+                          {log.recipient_email}
+                        </span>
+                        {log.recipient_name && (
+                          <span className="text-[11px] text-slate-400 block truncate max-w-[180px]">
+                            {log.recipient_name}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 block truncate max-w-[240px]">
+                          {log.subject}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          Event: {log.event_type} {log.reference_number ? `(${log.reference_number})` : ''}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                          log.delivery_status === 'sent'
+                            ? 'bg-[#0ACF83]/15 text-[#0ACF83] border border-[#0ACF83]/30'
+                            : log.delivery_status === 'delivered'
+                            ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                            : log.delivery_status === 'failed' || log.delivery_status === 'bounced'
+                            ? 'bg-red-500/15 text-red-500 border border-red-500/30'
+                            : 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                        }`}>
+                          {log.delivery_status}
+                        </span>
+                        {log.error_message && (
+                          <span className="text-[10px] text-red-400 block truncate max-w-[160px] mt-0.5" title={log.error_message}>
+                            {log.error_message}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500">
+                        {formatDate(log.sent_at || log.created_at)}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500 font-mono">
+                        {log.attempts || 1}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => handleResend(log.id)}
+                          disabled={resendingId === log.id}
+                          className="px-2.5 py-1 rounded-lg bg-[#0D99FF]/15 text-[#0D99FF] hover:bg-[#0D99FF] hover:text-white text-[11px] font-semibold transition-all inline-flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Send className="w-3 h-3" />
+                          <span>{resendingId === log.id ? 'Sending...' : 'Resend'}</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

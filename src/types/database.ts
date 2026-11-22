@@ -1004,4 +1004,55 @@ export interface SystemAlert {
   created_at: string
 }
 
+// ─── Phase 11: Email & Business Automation Types ──────────────────────────────
+
+export type EmailDeliveryStatus = 'queued' | 'sent' | 'delivered' | 'bounced' | 'failed'
+export type AutomationCategory = 'lead' | 'quotation' | 'agreement' | 'payment' | 'project' | 'handover' | 'maintenance'
+
+export interface EmailLog {
+  id: string
+  recipient_email: string
+  recipient_name?: string | null
+  event_type: string
+  category: AutomationCategory | string
+  subject: string
+  reference_id?: string | null
+  reference_number?: string | null
+  delivery_status: EmailDeliveryStatus
+  provider_message_id?: string | null
+  error_message?: string | null
+  attempts: number
+  html_body?: string | null
+  sent_at?: string | null
+  delivered_at?: string | null
+  deduplication_key?: string | null
+  created_at: string
+  updated_at?: string
+}
+
+export type NotificationSeverity = 'info' | 'warning' | 'critical' | 'success'
+
+export interface InternalNotification {
+  id: string
+  category: string
+  title: string
+  message: string
+  link_url?: string | null
+  severity: NotificationSeverity
+  is_read: boolean
+  created_at: string
+}
+
+export interface AutomationRule {
+  id: string
+  event_name: string
+  category: AutomationCategory | string
+  description?: string | null
+  is_enabled: boolean
+  delay_days: number
+  recipient_type: 'client' | 'admin' | 'both'
+  updated_at?: string
+}
+
+
 

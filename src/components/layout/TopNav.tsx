@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import { isSupabaseConfigured, testDatabaseConnection } from '../../lib/supabase'
 import ShareModal from './ShareModal'
 import CommandPalette from './CommandPalette'
+import NotificationCenter from './NotificationCenter'
 
 interface TopNavProps {
   onOpenCommandPalette?: () => void
@@ -30,6 +31,8 @@ export default function TopNav({}: TopNavProps) {
   const navigate = useNavigate()
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isCommandOpen, setIsCommandOpen] = useState(false)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(1)
   const [zoomLevel, setZoomLevel] = useState('100%')
   const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false)
   const [activeMode, setActiveMode] = useState<'canvas' | 'table'>('canvas')
@@ -144,6 +147,24 @@ export default function TopNav({}: TopNavProps) {
           </button>
 
           <div className="h-4 w-px bg-slate-200 dark:bg-[#383838]" />
+
+          {/* Internal Notification Center Trigger */}
+          <div className="relative">
+            <button
+              onClick={() => setIsNotificationOpen(prev => !prev)}
+              className="relative p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#383838] text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
+              title="Internal Notification Center"
+            >
+              <Bell className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+              {unreadCount > 0 && (
+                <span className="absolute 0 top-1 right-1 w-2 h-2 rounded-full bg-[#0D99FF] animate-pulse" />
+              )}
+            </button>
+            <NotificationCenter
+              isOpen={isNotificationOpen}
+              onClose={() => setIsNotificationOpen(false)}
+            />
+          </div>
 
           {/* Theme Toggle */}
           <motion.button
