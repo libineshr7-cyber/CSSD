@@ -318,89 +318,90 @@ export default function DocumentsPage() {
   }, [documents, search, categoryFilter, clientFilter, showArchived, clientMap])
 
   return (
-    <div className="space-y-6 animate-fade-in p-6 bg-slate-950 text-slate-100 min-h-screen">
+    <div className="space-y-6 animate-fade-in pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
-            <FolderOpen className="w-7 h-7 text-blue-400" />
-            Document Management &amp; Storage Architecture
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <FolderOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            Document Vault &amp; Storage Architecture
           </h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            Private client-specific folders, time-limited signed URLs, version history, and automated secondary DR backups
+          <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+            Private client-specific logical folders, time-limited signed URLs, version history, and automated DR backups.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={loadData}
-            className="p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-colors border border-slate-800"
+            className="btn-secondary"
             title="Refresh from Supabase"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
           </button>
-          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1">
+          <div className="flex bg-slate-100 dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg p-0.5">
             <button
               onClick={() => setView('grid')}
-              className={`p-1.5 rounded-lg transition-colors ${view === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`p-1.5 rounded-md transition-colors ${view === 'grid' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'}`}
               title="Grid View"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setView('table')}
-              className={`p-1.5 rounded-lg transition-colors ${view === 'table' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`p-1.5 rounded-md transition-colors ${view === 'table' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'}`}
               title="Table View"
             >
-              <List className="w-4 h-4" />
+              <List className="w-3.5 h-3.5" />
             </button>
           </div>
           <button
             onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all"
+            className="btn-primary"
           >
-            <Upload className="w-4 h-4" /> Upload Document
+            <Upload className="w-3.5 h-3.5" /> <span>Upload Document</span>
           </button>
         </div>
       </div>
 
       {/* Security Banner: Signed URLs & Private Buckets */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-start gap-3.5 shadow-md">
-        <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 shrink-0 mt-0.5">
-          <Lock className="w-5 h-5" />
+      <div className="p-3.5 bg-slate-50 dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl flex items-start gap-3 shadow-xs">
+        <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+          <Lock className="w-4 h-4" />
         </div>
         <div className="text-xs space-y-1">
-          <div className="font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" /> Private Bucket &amp; Signed URL Security Mandate
+          <div className="font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wide flex items-center gap-1.5 text-[11px]">
+            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Private Bucket &amp; Signed URL Security Mandate
           </div>
-          <p className="text-slate-400 leading-relaxed">
+          <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-xs">
             In compliance with CapeSecure privacy requirements: <strong>Storage buckets are never publicly accessible</strong>. All files are organized in logical paths (<code>clients/&#123;client_id&#125;/&#123;category&#125;/&#123;doc_id&#125;</code>) and accessed strictly via time-limited signed URLs that expire after 3,600 seconds.
           </p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-slate-900 border border-slate-800 rounded-2xl p-1.5 w-fit">
+      <div className="flex gap-1.5 bg-slate-100 dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg p-1 w-fit">
         <button
           onClick={() => setActiveTab('documents')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
             activeTab === 'documents'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-              : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+              ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
         >
-          <FileText size={15} />
+          <FileText size={14} />
           Document Registry ({documents.filter(d => !d.archived).length})
         </button>
         <button
           onClick={() => setActiveTab('backup')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
             activeTab === 'backup'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-              : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+              ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
         >
-          <HardDrive size={15} />
-          Backup &amp; Disaster Recovery Strategy ({backups.length})
+          <HardDrive size={14} />
+          Disaster Recovery Strategy ({backups.length})
         </button>
       </div>
 

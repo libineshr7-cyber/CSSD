@@ -2,143 +2,155 @@
 
 @layer base {
   :root {
-    --bg-canvas: #f5f5f5;
+    --bg-canvas: #f8fafc;
     --bg-surface: #ffffff;
     --bg-panel: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-tertiary: #f1f5f9;
-    --border: #e5e5e5;
-    --border-subtle: #f0f0f0;
-    --text-primary: #1e1e1e;
-    --text-secondary: #575757;
-    --text-muted: #8c8c8c;
-    --figma-blue: #0d99ff;
-    --figma-blue-hover: #007be5;
-    --figma-purple: #a259ff;
-    --figma-green: #0acf83;
-    --figma-red: #f24e1e;
-    --figma-yellow: #ffc700;
-    --sidebar-bg: #2c2c2c;
-    --sidebar-text: #e0e0e0;
-    --sidebar-hover: #383838;
-    --sidebar-active: #0d99ff;
+    --bg-secondary: #f1f5f9;
+    --bg-tertiary: #e2e8f0;
+    --border: #e2e8f0;
+    --border-subtle: #f1f5f9;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    
+    --brand-blue: #2563eb;
+    --brand-blue-hover: #1d4ed8;
+    --brand-emerald: #10b981;
+    --brand-amber: #f59e0b;
+    --brand-rose: #f43f5e;
+    --brand-indigo: #6366f1;
+
+    --sidebar-bg: #ffffff;
+    --sidebar-text: #475569;
+    --sidebar-hover: #f1f5f9;
+    --sidebar-active: #2563eb;
   }
 
   .dark {
-    --bg-canvas: #1e1e1e;
-    --bg-surface: #2c2c2c;
-    --bg-panel: #252525;
-    --bg-secondary: #252525;
-    --bg-tertiary: #383838;
-    --border: #383838;
-    --border-subtle: #2e2e2e;
-    --text-primary: #f5f5f5;
-    --text-secondary: #a3a3a3;
-    --text-muted: #737373;
-    --figma-blue: #0d99ff;
-    --figma-blue-hover: #38bdf8;
-    --figma-purple: #a259ff;
-    --figma-green: #0acf83;
-    --figma-red: #f24e1e;
-    --figma-yellow: #ffc700;
-    --sidebar-bg: #181818;
-    --sidebar-text: #a3a3a3;
-    --sidebar-hover: #262626;
-    --sidebar-active: #0d99ff;
+    --bg-canvas: #090d16;
+    --bg-surface: #0e1526;
+    --bg-panel: #0d1322;
+    --bg-secondary: #131c31;
+    --bg-tertiary: #1a253f;
+    --border: #1e293b;
+    --border-subtle: #162032;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    
+    --brand-blue: #3b82f6;
+    --brand-blue-hover: #60a5fa;
+    --brand-emerald: #10b981;
+    --brand-amber: #f59e0b;
+    --brand-rose: #f43f5e;
+    --brand-indigo: #818cf8;
+
+    --sidebar-bg: #0b101d;
+    --sidebar-text: #94a3b8;
+    --sidebar-hover: #131c31;
+    --sidebar-active: #3b82f6;
   }
 
   * {
-    @apply border-[#e5e5e5] dark:border-[#383838];
+    @apply border-slate-200 dark:border-slate-800;
   }
 
   body {
-    @apply bg-[#f5f5f5] dark:bg-[#1e1e1e] text-[#1e1e1e] dark:text-[#f5f5f5] font-sans antialiased selection:bg-[#0d99ff]/20 selection:text-[#0d99ff];
+    @apply bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-blue-600/20 selection:text-blue-600;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
-  /* Authentic Figma Canvas Dot Pattern */
-  .figma-canvas-dots {
-    background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-  .dark .figma-canvas-dots {
-    background-image: radial-gradient(circle, #333333 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-
+  /* Micro Scrollbars */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-[#404040] rounded-full;
+    @apply bg-slate-300 dark:bg-slate-700/60 rounded-full;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-[#525252];
+    @apply bg-slate-400 dark:bg-slate-600;
   }
 }
 
 @layer components {
-  /* Figma Card with subtle craft shadow and precision border */
-  .card, .figma-card {
-    @apply bg-white dark:bg-[#2c2c2c] border border-[#e5e5e5] dark:border-[#383838] rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-150;
+  /* Premium SaaS Fintech Card */
+  .card, .saas-card {
+    @apply bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-[0_1px_3px_0_rgba(15,23,42,0.03)] dark:shadow-[0_1px_3px_0_rgba(0,0,0,0.3),inset_0_1px_0_0_rgba(255,255,255,0.03)] transition-all duration-150;
   }
 
-  .card:hover, .figma-card:hover {
-    @apply border-slate-300 dark:border-[#4d4d4d];
+  .card:hover, .saas-card:hover {
+    @apply border-slate-300 dark:border-slate-700/80;
   }
 
-  .btn-primary, .figma-btn-primary {
-    @apply inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#0d99ff] hover:bg-[#007be5] text-white text-xs font-semibold rounded-lg shadow-sm active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#0d99ff]/50;
+  /* Action Buttons */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-medium rounded-lg shadow-xs active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500/40;
   }
 
-  .btn-secondary, .figma-btn-secondary {
-    @apply inline-flex items-center gap-2 px-3.5 py-1.5 bg-white dark:bg-[#2c2c2c] hover:bg-slate-50 dark:hover:bg-[#383838] text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg border border-[#e5e5e5] dark:border-[#383838] shadow-xs active:scale-95 transition-all duration-150;
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white dark:bg-[#0e1526] hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs active:scale-[0.98] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-slate-400/20;
   }
 
   .btn-danger {
-    @apply inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#f24e1e] hover:bg-red-700 text-white text-xs font-medium rounded-lg shadow-sm transition-all duration-150 active:scale-95;
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium rounded-lg shadow-xs active:scale-[0.98] transition-all duration-150;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-2.5 py-1.5 hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors duration-150;
+    @apply inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-lg transition-colors duration-150;
   }
 
+  /* Inputs & Form Elements */
   .input {
-    @apply w-full px-3 py-2 bg-white dark:bg-[#252525] border border-[#e5e5e5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0d99ff] focus:border-transparent transition-all;
+    @apply w-full px-3 py-1.5 bg-white dark:bg-[#0d1322] border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-all;
   }
 
   .label {
     @apply block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 tracking-tight;
   }
 
+  /* Status Pills */
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium tracking-tight;
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium tracking-tight;
   }
 
-  .badge-blue   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#0d99ff]/10 text-[#0d99ff] border border-[#0d99ff]/20; }
-  .badge-green  { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#0acf83]/10 text-[#0acf83] border border-[#0acf83]/20; }
-  .badge-yellow { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#ffc700]/15 text-amber-700 dark:text-[#ffc700] border border-[#ffc700]/25; }
-  .badge-red    { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#f24e1e]/10 text-[#f24e1e] border border-[#f24e1e]/20; }
-  .badge-purple { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#a259ff]/10 text-[#a259ff] border border-[#a259ff]/20; }
-  .badge-gray   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-[#333333] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700; }
+  .badge-blue {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20;
+  }
+  .badge-green {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20;
+  }
+  .badge-yellow {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20;
+  }
+  .badge-red {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20;
+  }
+  .badge-purple {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20;
+  }
+  .badge-gray {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700;
+  }
 
+  /* Sophisticated Fintech Tables */
   .table-wrapper {
-    @apply overflow-x-auto rounded-xl border border-[#e5e5e5] dark:border-[#383838] bg-white dark:bg-[#2c2c2c];
+    @apply overflow-x-auto rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#0e1526] shadow-xs;
   }
 
   .table {
-    @apply w-full text-xs;
+    @apply w-full text-xs text-left;
   }
 
   .table th {
-    @apply px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-[#e5e5e5] dark:border-[#383838] bg-slate-50/70 dark:bg-[#252525]/70;
+    @apply px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-[#0b101d]/80;
   }
 
   .table td {
-    @apply px-4 py-2.5 text-slate-700 dark:text-slate-300 border-b border-[#f0f0f0] dark:border-[#333333];
+    @apply px-4 py-2.5 text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800/60 align-middle;
   }
 
   .table tr:last-child td {
@@ -146,34 +158,6 @@
   }
 
   .table tr:hover td {
-    @apply bg-slate-50/80 dark:bg-[#333333]/40;
-  }
-
-  .stat-card {
-    @apply bg-white dark:bg-[#2c2c2c] border border-[#e5e5e5] dark:border-[#383838] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5;
-  }
-
-  .page-header {
-    @apply flex items-start justify-between mb-6;
-  }
-
-  .page-title {
-    @apply text-xl font-bold text-slate-900 dark:text-[#f5f5f5] tracking-tight;
-  }
-
-  .page-subtitle {
-    @apply text-xs text-slate-500 dark:text-slate-400 mt-0.5;
-  }
-
-  .section-title {
-    @apply text-sm font-semibold text-slate-800 dark:text-slate-200;
-  }
-
-  .form-group {
-    @apply flex flex-col gap-1.5;
-  }
-
-  .sidebar-link {
-    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer;
+    @apply bg-slate-50/70 dark:bg-slate-800/40;
   }
 }

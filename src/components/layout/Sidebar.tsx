@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, UserCheck, FileText, Receipt, FileSignature,
   CreditCard, FileSpreadsheet, Briefcase, CheckSquare, Paintbrush, TestTube,
   Rocket, HandshakeIcon, Wrench, Activity, LifeBuoy, FolderOpen,
-  BarChart3, Settings, ChevronDown, ChevronRight, Search, ExternalLink, User
+  BarChart3, Settings, ChevronDown, ChevronRight, Search, ExternalLink, ShieldCheck
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
@@ -28,48 +28,48 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
-    title: 'CANVAS & OVERVIEW',
+    title: 'WORKSPACE',
     items: [
       { label: 'Overview', path: '/admin', module: 'overview', icon: LayoutDashboard, exact: true },
-      { label: 'Analytics', path: '/admin/reports', module: 'reports', icon: BarChart3, badge: 'New', badgeColor: 'bg-[#0ACF83]/15 text-[#0ACF83]' },
+      { label: 'Analytics & KPIs', path: '/admin/reports', module: 'reports', icon: BarChart3, badge: 'Live', badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
     ]
   },
   {
-    title: 'CRM & BUSINESS',
+    title: 'CRM & CLIENTS',
     items: [
-      { label: 'Leads', path: '/admin/leads', module: 'leads', icon: Users, badge: '12' },
-      { label: 'Clients', path: '/admin/clients', module: 'clients', icon: UserCheck },
-      { label: 'Requirements', path: '/admin/requirements', module: 'requirements', icon: FileText },
+      { label: 'Leads Pipeline', path: '/admin/leads', module: 'leads', icon: Users },
+      { label: 'Client Accounts', path: '/admin/clients', module: 'clients', icon: UserCheck },
+      { label: 'PRD Requirements', path: '/admin/requirements', module: 'requirements', icon: FileText },
       { label: 'Quotations', path: '/admin/quotations', module: 'quotations', icon: Receipt },
-      { label: 'Agreements', path: '/admin/agreements', module: 'agreements', icon: FileSignature },
+      { label: 'Legal Agreements', path: '/admin/agreements', module: 'agreements', icon: FileSignature },
     ]
   },
   {
     title: 'FINANCE & BILLING',
     items: [
-      { label: 'Payments', path: '/admin/payments', module: 'payments', icon: CreditCard },
-      { label: 'Invoices', path: '/admin/invoices', module: 'invoices', icon: FileSpreadsheet, badge: 'Due' },
+      { label: 'Payments & Gateway', path: '/admin/payments', module: 'payments', icon: CreditCard },
+      { label: 'GST Invoices', path: '/admin/invoices', module: 'invoices', icon: FileSpreadsheet, badge: 'GST', badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' },
     ]
   },
   {
-    title: 'PRODUCTION & QA',
+    title: 'ENGINEERING & QA',
     items: [
-      { label: 'Projects', path: '/admin/projects', module: 'projects', icon: Briefcase, badge: '8' },
-      { label: 'Tasks', path: '/admin/tasks', module: 'tasks', icon: CheckSquare },
-      { label: 'Design Approvals', path: '/admin/design-approvals', module: 'design-approvals', icon: Paintbrush, badgeColor: 'bg-[#A259FF]/15 text-[#A259FF]' },
-      { label: 'Testing & QA', path: '/admin/testing', module: 'testing', icon: TestTube },
+      { label: 'Projects Pipeline', path: '/admin/projects', module: 'projects', icon: Briefcase },
+      { label: 'Tasks & Sprints', path: '/admin/tasks', module: 'tasks', icon: CheckSquare },
+      { label: 'Design Approvals', path: '/admin/design-approvals', module: 'design-approvals', icon: Paintbrush, badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' },
+      { label: 'Testing & QA Matrix', path: '/admin/testing', module: 'testing', icon: TestTube },
       { label: 'Deployments', path: '/admin/deployments', module: 'deployments', icon: Rocket },
-      { label: 'Handover', path: '/admin/handover', module: 'handover', icon: HandshakeIcon },
+      { label: 'Client Handover', path: '/admin/handover', module: 'handover', icon: HandshakeIcon },
     ]
   },
   {
     title: 'OPERATIONS & SUPPORT',
     items: [
-      { label: 'Maintenance', path: '/admin/maintenance', module: 'maintenance', icon: Wrench },
-      { label: 'Monitoring', path: '/admin/monitoring', module: 'monitoring', icon: Activity },
-      { label: 'Support Tickets', path: '/admin/tickets', module: 'tickets', icon: LifeBuoy, badge: '3', badgeColor: 'bg-[#F24E1E]/15 text-[#F24E1E]' },
-      { label: 'Documents', path: '/admin/documents', module: 'documents', icon: FolderOpen },
-      { label: 'Settings', path: '/admin/settings', module: 'settings', icon: Settings },
+      { label: 'Maintenance SLAs', path: '/admin/maintenance', module: 'maintenance', icon: Wrench },
+      { label: 'Website Monitoring', path: '/admin/monitoring', module: 'monitoring', icon: Activity },
+      { label: 'Support Tickets', path: '/admin/tickets', module: 'tickets', icon: LifeBuoy },
+      { label: 'Document Vault', path: '/admin/documents', module: 'documents', icon: FolderOpen },
+      { label: 'System Settings', path: '/admin/settings', module: 'settings', icon: Settings },
     ]
   }
 ]
@@ -89,39 +89,49 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-white dark:bg-[#252525] border-r border-[#E5E5E5] dark:border-[#383838] flex flex-col h-full select-none z-20">
+    <aside className="w-60 flex-shrink-0 bg-white dark:bg-[#0b101d] border-r border-slate-200 dark:border-slate-800/80 flex flex-col h-full select-none z-20 transition-all duration-200">
       
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#E5E5E5] dark:border-[#383838]">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="CapeSecure" className="w-4 h-4 rounded object-contain" />
-          <span className="text-xs font-bold tracking-tight text-slate-800 dark:text-slate-100">
-            Navigation
-          </span>
-        </div>
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${roleInfo.badge}`}>
+      {/* Brand Header */}
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-200/80 dark:border-slate-800/80">
+        <Link to="/admin" className="flex items-center gap-2.5 group">
+          <div className="w-7 h-7 rounded-lg bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                CapeSecure
+              </span>
+              <span className="text-[9px] font-semibold px-1 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono">
+                BMS
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400 font-medium">Enterprise Suite</div>
+          </div>
+        </Link>
+
+        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase tracking-wider ${roleInfo.badge}`}>
           {roleInfo.label.split(' ')[0]}
         </span>
       </div>
 
-      {/* Search Filter */}
-      <div className="p-2 border-b border-[#E5E5E5] dark:border-[#383838]">
+      {/* Quick Filter Box */}
+      <div className="p-2.5 border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
             type="text"
             placeholder="Filter modules..."
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            className="w-full pl-7 pr-2 py-1 bg-slate-50 dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#333333] rounded-md text-[11px] text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:border-[#0D99FF]"
+            className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
           />
         </div>
       </div>
 
-      {/* Nav List with RBAC module gating */}
-      <nav className="flex-1 overflow-y-auto p-1.5 space-y-1 figma-scrollbar">
+      {/* Navigation Groups with Module Permissions */}
+      <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-3">
         {navSections.map((section) => {
-          // Filter items based on user's active role permission and search filter
           const allowedItems = section.items
             .filter(item => canView(item.module))
             .filter(item => !searchFilter || item.label.toLowerCase().includes(searchFilter.toLowerCase()))
@@ -131,10 +141,10 @@ export default function Sidebar() {
           const isCollapsed = collapsedSections[section.title]
 
           return (
-            <div key={section.title} className="mb-1">
+            <div key={section.title} className="space-y-0.5">
               <button
                 onClick={() => toggleSection(section.title)}
-                className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-400 uppercase rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors group cursor-pointer"
+                className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-semibold tracking-wider text-slate-400 dark:text-slate-400 uppercase rounded hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
               >
                 <span>{section.title}</span>
                 <span className="text-slate-400 opacity-60 group-hover:opacity-100">
@@ -149,7 +159,7 @@ export default function Sidebar() {
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="overflow-hidden space-y-0.5 mt-0.5"
+                    className="overflow-hidden space-y-0.5"
                   >
                     {allowedItems.map((item) => {
                       const Icon = item.icon
@@ -162,39 +172,36 @@ export default function Sidebar() {
                             cn(
                               'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all group relative',
                               isActive
-                                ? 'bg-[#0D99FF]/10 text-[#0D99FF] font-semibold'
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/5 dark:hover:bg-white/5'
+                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                             )
                           }
                         >
                           {({ isActive }) => (
                             <>
-                              <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex items-center gap-2.5 min-w-0">
                                 <Icon
                                   className={cn(
-                                    'w-3.5 h-3.5 flex-shrink-0 transition-colors',
+                                    'w-4 h-4 flex-shrink-0 transition-colors',
                                     isActive
-                                      ? 'text-[#0D99FF]'
-                                      : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                                      ? 'text-blue-600 dark:text-blue-400'
+                                      : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'
                                   )}
                                 />
-                                <span className="truncate text-xs">{item.label}</span>
+                                <span className="truncate">{item.label}</span>
                               </div>
 
                               <div className="flex items-center gap-1.5">
                                 {item.badge && (
                                   <span className={cn(
-                                    'text-[9px] font-semibold px-1.5 py-0.2 rounded-full',
-                                    item.badgeColor || 'bg-slate-100 dark:bg-[#333333] text-slate-500 dark:text-slate-400'
+                                    'text-[9px] font-semibold px-1.5 py-0.2 rounded-md',
+                                    item.badgeColor || 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                                   )}>
                                     {item.badge}
                                   </span>
                                 )}
                                 {isActive && (
-                                  <motion.div
-                                    layoutId="figmaActiveDot"
-                                    className="w-1.5 h-1.5 rounded-full bg-[#0D99FF]"
-                                  />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
                                 )}
                               </div>
                             </>
@@ -210,37 +217,37 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Admin Profile Footer Card */}
-      <div className="border-t border-[#E5E5E5] dark:border-[#383838] p-2 space-y-1.5 bg-slate-50/50 dark:bg-[#202020]">
+      {/* Administrator Profile Footer */}
+      <div className="border-t border-slate-200/80 dark:border-slate-800/80 p-2.5 space-y-1.5 bg-slate-50/70 dark:bg-[#090d16]/70">
         <Link
           to="/"
-          className="flex items-center justify-between px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#2C2C2C] transition-colors"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
         >
           <span className="flex items-center gap-2">
-            <ExternalLink className="w-3.5 h-3.5 text-[#0D99FF]" />
+            <ExternalLink className="w-3.5 h-3.5 text-blue-500" />
             <span>Public Website</span>
           </span>
-          <span className="text-[10px] text-slate-400">Live</span>
+          <span className="text-[10px] text-slate-400 font-mono">Live</span>
         </Link>
 
-        {/* User Profile Link */}
+        {/* User Card */}
         <Link
           to="/admin/profile"
-          className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group"
-          title="Click to view & edit admin profile"
+          className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors group cursor-pointer"
+          title="Manage administrator security & profile"
         >
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#0D99FF] to-[#A259FF] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
+          <div className="w-7 h-7 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
             {profile?.full_name ? profile.full_name.slice(0, 2).toUpperCase() : user?.email?.slice(0, 2).toUpperCase() || 'AD'}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-[#0D99FF] transition-colors">
+            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
               {profile?.full_name || 'Admin User'}
             </div>
             <div className="text-[10px] text-slate-400 truncate">
               {roleInfo.label}
             </div>
           </div>
-          <div className="w-2 h-2 rounded-full bg-[#0ACF83]" title="Authenticated" />
+          <div className="w-2 h-2 rounded-full bg-emerald-500" title="Active Session" />
         </Link>
       </div>
     </aside>

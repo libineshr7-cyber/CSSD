@@ -4,7 +4,8 @@ import {
   Building2, Mail, Phone, MapPin,
   Calendar, FileText, CheckCircle2,
   Clock, ShieldAlert, Copy, Check, Eye,
-  RefreshCw, DollarSign, Briefcase
+  RefreshCw, DollarSign, Briefcase, MessageSquare,
+  Users, ExternalLink
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatCurrency, formatDate } from '../lib/utils'
@@ -29,21 +30,21 @@ const BUSINESS_CATEGORIES = [
   'Other',
 ]
 
-const COMM_METHODS: { key: PreferredComm; label: string; icon: string }[] = [
-  { key: 'email', label: 'Email', icon: '✉️' },
-  { key: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-  { key: 'phone', label: 'Phone', icon: '📞' },
-  { key: 'slack', label: 'Slack', icon: '💼' },
-  { key: 'teams', label: 'MS Teams', icon: '👥' },
+const COMM_METHODS: { key: PreferredComm; label: string; icon: any }[] = [
+  { key: 'email', label: 'Email', icon: Mail },
+  { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
+  { key: 'phone', label: 'Phone', icon: Phone },
+  { key: 'slack', label: 'Slack', icon: Briefcase },
+  { key: 'teams', label: 'MS Teams', icon: Users },
 ]
 
 const CLIENT_STATUS_STYLES: Record<ClientStatus, { badge: string; dot: string; label: string }> = {
-  active:    { badge: 'bg-green-500/10 text-green-400 border-green-500/20',   dot: 'bg-green-500',  label: 'Active' },
-  inactive:  { badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',  dot: 'bg-slate-500', label: 'Inactive' },
-  suspended: { badge: 'bg-red-500/10 text-red-400 border-red-500/20',        dot: 'bg-red-500',   label: 'Suspended' },
-  churned:   { badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20',dot: 'bg-orange-500',label: 'Churned' },
-  archived:  { badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',  dot: 'bg-amber-500', label: 'Archived' },
-  completed: { badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',     dot: 'bg-blue-500',  label: 'Completed' },
+  active:    { badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-500', label: 'Active' },
+  inactive:  { badge: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',     dot: 'bg-slate-400',   label: 'Inactive' },
+  suspended: { badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',           dot: 'bg-rose-500',    label: 'Suspended' },
+  churned:   { badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',       dot: 'bg-amber-500',   label: 'Churned' },
+  archived:  { badge: 'bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20',       dot: 'bg-slate-500',   label: 'Archived' },
+  completed: { badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',           dot: 'bg-blue-500',    label: 'Completed' },
 }
 
 export default function ClientsPage() {
@@ -279,35 +280,35 @@ export default function ClientsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Total Clients</div>
-          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">{clients.length}</div>
+        <div className="p-3.5 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-xs">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Total Clients</div>
+          <div className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1">{clients.length}</div>
         </div>
 
-        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Active Accounts</div>
-          <div className="text-xl font-bold text-green-500 mt-1">
+        <div className="p-3.5 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-xs">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Active Accounts</div>
+          <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
             {clients.filter(c => c.status === 'active').length}
           </div>
         </div>
 
-        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Corporate & Enterprise</div>
-          <div className="text-xl font-bold text-blue-500 mt-1">
+        <div className="p-3.5 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-xs">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Corporate & Enterprise</div>
+          <div className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">
             {clients.filter(c => (c.business_category || '').includes('Corporate') || (c.business_category || '').includes('Finance')).length}
           </div>
         </div>
 
-        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">E-Commerce Clients</div>
-          <div className="text-xl font-bold text-purple-500 mt-1">
+        <div className="p-3.5 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-xs">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">E-Commerce Clients</div>
+          <div className="text-xl font-bold font-mono text-indigo-600 dark:text-indigo-400 mt-1">
             {clients.filter(c => (c.business_category || '').includes('E-Commerce')).length}
           </div>
         </div>
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="p-3 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl space-y-3">
+      <div className="p-3 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl space-y-3 shadow-xs">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Search */}
           <div className="relative flex-1">
@@ -317,7 +318,7 @@ export default function ClientsPage() {
               placeholder="Search by Client ID (CS-CLIENT-0001), Client name, Business, Email, Phone, GSTIN..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1) }}
-              className="w-full pl-9 pr-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0D99FF]"
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-[#0b101d] border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1.5 focus:ring-blue-600 focus:border-blue-600"
             />
           </div>
 
@@ -326,7 +327,7 @@ export default function ClientsPage() {
             <select
               value={categoryFilter}
               onChange={e => { setCategoryFilter(e.target.value); setPage(1) }}
-              className="px-2.5 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
+              className="px-2.5 py-1.5 bg-slate-50 dark:bg-[#0b101d] border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
             >
               <option value="all">All Categories</option>
               {BUSINESS_CATEGORIES.map(cat => (
@@ -338,7 +339,7 @@ export default function ClientsPage() {
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as any)}
-              className="px-2.5 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
+              className="px-2.5 py-1.5 bg-slate-50 dark:bg-[#0b101d] border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
             >
               <option value="id_desc">Client ID (Newest)</option>
               <option value="name_asc">Client Name (A–Z)</option>
@@ -348,13 +349,13 @@ export default function ClientsPage() {
         </div>
 
         {/* Status Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-[#E5E5E5] dark:border-[#2D2D2D] pt-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-slate-200/80 dark:border-slate-800/80 pt-2">
           <button
             onClick={() => { setStatusFilter('all'); setPage(1) }}
-            className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap ${
+            className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap text-xs ${
               statusFilter === 'all'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#282828]'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
             All Accounts ({clients.length})
@@ -367,10 +368,10 @@ export default function ClientsPage() {
               <button
                 key={st}
                 onClick={() => { setStatusFilter(st); setPage(1) }}
-                className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 text-xs ${
                   statusFilter === st
-                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#282828]'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
@@ -382,7 +383,7 @@ export default function ClientsPage() {
       </div>
 
       {/* Clients Table */}
-      <div className="bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl overflow-hidden shadow-sm">
+      <div className="table-wrapper">
         {paginatedClients.length === 0 ? (
           <div className="py-16 text-center">
             <Building2 className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
@@ -393,33 +394,34 @@ export default function ClientsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="table">
               <thead>
-                <tr className="border-b border-[#E5E5E5] dark:border-[#2D2D2D] bg-[#F9FAFB] dark:bg-[#252525] text-slate-500 dark:text-slate-400 font-medium">
-                  <th className="py-2.5 px-4">Client ID</th>
-                  <th className="py-2.5 px-4">Client & Business</th>
-                  <th className="py-2.5 px-4">Category</th>
-                  <th className="py-2.5 px-4">Contact Info</th>
-                  <th className="py-2.5 px-4">Preferred Comm</th>
-                  <th className="py-2.5 px-4">Status</th>
-                  <th className="py-2.5 px-4 text-right">Actions</th>
+                <tr>
+                  <th>Client ID</th>
+                  <th>Client & Business</th>
+                  <th>Category</th>
+                  <th>Contact Info</th>
+                  <th>Preferred Comm</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E5E5E5] dark:divide-[#2D2D2D]">
+              <tbody>
                 {paginatedClients.map(client => {
                   const statusStyle = CLIENT_STATUS_STYLES[client.status] || CLIENT_STATUS_STYLES.active
                   const comm = COMM_METHODS.find(m => m.key === client.preferred_comm) || COMM_METHODS[0]
+                  const CommIcon = comm.icon
 
                   return (
                     <tr
                       key={client.id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-[#252525]/50 transition-colors cursor-pointer"
+                      className="cursor-pointer"
                       onClick={() => openClientHistory(client.id)}
                     >
                       {/* Client ID */}
-                      <td className="py-3 px-4" onClick={e => e.stopPropagation()}>
+                      <td onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-[#0D99FF]">
+                          <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
                             {client.client_code || 'CS-CLIENT-XXXX'}
                           </span>
                           <button
@@ -428,13 +430,13 @@ export default function ClientsPage() {
                             className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                           >
                             {copiedId === client.client_code ? (
-                              <Check className="w-3 h-3 text-green-500" />
+                              <Check className="w-3 h-3 text-emerald-500" />
                             ) : (
                               <Copy className="w-3 h-3" />
                             )}
                           </button>
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                           Added {formatDate(client.created_at)}
                         </div>
                       </td>
@@ -477,23 +479,23 @@ export default function ClientsPage() {
                       </td>
 
                       {/* Preferred Comm */}
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-blue-500/10 text-blue-500 border border-blue-500/20 capitalize">
-                          <span>{comm.icon}</span>
+                      <td>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 capitalize">
+                          <CommIcon className="w-3 h-3" />
                           <span>{comm.label}</span>
                         </span>
                       </td>
 
                       {/* Status */}
-                      <td className="py-3 px-4">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusStyle.badge}`}>
+                      <td>
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium border ${statusStyle.badge}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
                           {statusStyle.label}
                         </span>
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
+                      <td className="text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => openClientHistory(client.id)}
@@ -989,7 +991,7 @@ function ClientFormModal({
                 className="w-full px-3 py-2 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100"
               >
                 {COMM_METHODS.map(m => (
-                  <option key={m.key} value={m.key}>{m.icon} {m.label}</option>
+                  <option key={m.key} value={m.key}>{m.label}</option>
                 ))}
               </select>
             </div>

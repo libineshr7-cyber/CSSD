@@ -296,48 +296,49 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in p-6 bg-slate-950 text-slate-100 min-h-screen">
+    <div className="space-y-6 animate-fade-in pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
-            <CheckSquare className="w-7 h-7 text-blue-400" />
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <CheckSquare className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             Task Management &amp; Deliverables
           </h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            Assign team members, set priorities &amp; deadlines, track progress, and collaborate with comments &amp; attachments
+          <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+            Assign team members, set priorities &amp; deadlines, track progress, and collaborate across engineering sprints.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={loadData}
-            className="p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-colors border border-slate-800"
+            className="btn-secondary"
             title="Refresh from Supabase"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
           </button>
-          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1">
+          <div className="flex bg-slate-100 dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg p-0.5">
             <button
               onClick={() => setView('board')}
-              className={`p-1.5 rounded-lg transition-colors ${view === 'board' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`p-1.5 rounded-md transition-colors ${view === 'board' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs font-medium' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'}`}
               title="Kanban Board View"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setView('list')}
-              className={`p-1.5 rounded-lg transition-colors ${view === 'list' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`p-1.5 rounded-md transition-colors ${view === 'list' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs font-medium' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'}`}
               title="Table List View"
             >
-              <List className="w-4 h-4" />
+              <List className="w-3.5 h-3.5" />
             </button>
           </div>
 
           <button
             onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all"
+            className="btn-primary"
           >
-            <Plus className="w-4 h-4" /> Add Task
+            <Plus className="w-3.5 h-3.5" /> <span>Add Task</span>
           </button>
         </div>
       </div>
@@ -345,19 +346,19 @@ export default function TasksPage() {
       {/* Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
             type="text"
             placeholder="Search tasks by title, details, assignee, or project..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-1.5 focus:ring-blue-600 focus:border-blue-600 shadow-xs"
           />
         </div>
         <select
           value={projectFilter}
           onChange={e => setProjectFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-sm sm:w-56 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-1.5 bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 text-xs sm:w-56 focus:outline-none shadow-xs"
         >
           <option value="all">All Projects</option>
           {projects.map(p => (
@@ -369,7 +370,7 @@ export default function TasksPage() {
         <select
           value={priorityFilter}
           onChange={e => setPriorityFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-sm sm:w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-1.5 bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 text-xs sm:w-40 focus:outline-none shadow-xs"
         >
           <option value="all">All Priorities</option>
           <option value="urgent">Urgent</option>
@@ -381,19 +382,19 @@ export default function TasksPage() {
 
       {/* ─── KANBAN BOARD VIEW ──────────────────────────────────────────────── */}
       {view === 'board' ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3.5 overflow-x-auto pb-4">
           {COLUMNS.map(col => {
             const colCfg = STATUS_CONFIG[col]
             const colTasks = filtered.filter(t => t.status === col)
 
             return (
-              <div key={col} className="flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3 min-w-[240px] space-y-3">
+              <div key={col} className="flex flex-col bg-slate-100/70 dark:bg-[#0b101d] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-3 min-w-[240px] space-y-3 shadow-xs">
                 {/* Column Header */}
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800 px-1">
-                  <span className="font-semibold text-xs text-slate-300 uppercase tracking-wider">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800/80 px-1">
+                  <span className="font-semibold text-[11px] text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     {colCfg.column}
                   </span>
-                  <span className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
+                  <span className="w-5 h-5 rounded-md bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 flex items-center justify-center text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400">
                     {colTasks.length}
                   </span>
                 </div>

@@ -430,10 +430,10 @@ export default function ClientPortalPage() {
   // --- Auth Screen Render ---
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#181818] flex items-center justify-center">
+      <div className="min-h-screen bg-[#090d16] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-[#0D99FF] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-slate-400">Verifying secure client credentials...</p>
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-slate-400">Verifying secure client credentials...</p>
         </div>
       </div>
     )
@@ -441,17 +441,19 @@ export default function ClientPortalPage() {
 
   if (!sessionClient) {
     return (
-      <div className="min-h-screen bg-[#181818] text-[#F5F5F5] flex flex-col justify-between selection:bg-[#0D99FF]/20 selection:text-[#0D99FF]">
+      <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col justify-between selection:bg-blue-600/20 selection:text-blue-500">
         {/* Header */}
-        <header className="border-b border-[#333333] px-6 py-4 flex items-center justify-between max-w-7xl mx-auto w-full">
+        <header className="border-b border-slate-800/80 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto w-full">
           <Link to="/" className="flex items-center gap-3 group">
-            <img src="/logo.png" alt="CapeSecure" className="w-9 h-9 rounded-xl object-contain drop-shadow" />
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
             <div>
-              <span className="font-bold text-sm tracking-tight text-white group-hover:text-[#0D99FF] transition-colors">
+              <span className="font-bold text-sm tracking-tight text-white group-hover:text-blue-500 transition-colors">
                 CapeSecure
               </span>
               <span className="text-[10px] text-slate-400 block -mt-0.5">
-                Client Security & Service Portal
+                Client Security &amp; Service Portal
               </span>
             </div>
           </Link>
@@ -460,7 +462,7 @@ export default function ClientPortalPage() {
               to="/login"
               className="text-xs text-slate-400 hover:text-white transition-colors"
             >
-              Admin Sign In →
+              Admin Sign In &rarr;
             </Link>
           </div>
         </header>
@@ -470,25 +472,23 @@ export default function ClientPortalPage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md bg-[#202020] border border-[#333333] rounded-2xl p-8 shadow-2xl relative overflow-hidden"
+            className="w-full max-w-md bg-[#0e1526] border border-slate-800/80 rounded-xl p-8 shadow-2xl relative overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#0D99FF]/10 rounded-full blur-2xl pointer-events-none" />
-
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0D99FF]/15 text-[#0D99FF] border border-[#0D99FF]/30 mb-4 shadow-inner">
-                <ShieldCheck className="w-7 h-7" />
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600/10 text-blue-500 border border-blue-500/20 mb-3 shadow-inner">
+                <ShieldCheck className="w-6 h-6" />
               </div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">
+              <h1 className="text-xl font-bold text-white tracking-tight">
                 Client Portal Login
               </h1>
-              <p className="text-xs text-slate-400 mt-2 max-w-sm mx-auto">
-                Securely review your project pipeline, approve designs & quotations, access signed agreements, tax invoices, and verified receipts.
+              <p className="text-xs text-slate-400 mt-1.5 max-w-sm mx-auto">
+                Securely review your project pipeline, approve designs &amp; quotations, access signed agreements, tax invoices, and verified receipts.
               </p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">
                   Client Email Address
                 </label>
                 <div className="relative">
@@ -499,20 +499,20 @@ export default function ClientPortalPage() {
                     onChange={(e) => setEmailInput(e.target.value)}
                     placeholder="e.g. client@company.com"
                     required
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#282828] border border-[#383838] focus:border-[#0D99FF] text-white text-xs placeholder:text-slate-500 outline-none transition-colors"
+                    className="w-full pl-10 pr-4 py-2 rounded-lg bg-[#0b101d] border border-slate-800 focus:border-blue-500 text-white text-xs placeholder:text-slate-500 outline-none transition-colors"
                   />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Client Passcode (or temporary access key)
+                  <label className="block text-xs font-medium text-slate-300">
+                    Client Passcode
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowResetModal(true)}
-                    className="text-[11px] text-[#0D99FF] hover:underline"
+                    className="text-[11px] text-blue-400 hover:underline"
                   >
                     Forgot passcode?
                   </button>
@@ -524,7 +524,7 @@ export default function ClientPortalPage() {
                     value={passcodeInput}
                     onChange={(e) => setPasscodeInput(e.target.value)}
                     placeholder="Enter assigned passcode"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#282828] border border-[#383838] focus:border-[#0D99FF] text-white text-xs placeholder:text-slate-500 outline-none transition-colors"
+                    className="w-full pl-10 pr-4 py-2 rounded-lg bg-[#0b101d] border border-slate-800 focus:border-blue-500 text-white text-xs placeholder:text-slate-500 outline-none transition-colors"
                   />
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">
@@ -535,7 +535,7 @@ export default function ClientPortalPage() {
               <button
                 type="submit"
                 disabled={submittingAuth}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#0D99FF] hover:bg-[#007BE5] text-white font-semibold text-xs transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+                className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
               >
                 {submittingAuth ? (
                   <>
@@ -551,10 +551,10 @@ export default function ClientPortalPage() {
               </button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-[#333333] text-center">
+            <div className="mt-6 pt-6 border-t border-slate-800 text-center">
               <div className="inline-flex items-center gap-2 text-[11px] text-slate-400">
-                <Shield className="w-3.5 h-3.5 text-[#0ACF83]" />
-                <span>Protected by 256-bit SSL encryption & client-isolated data security.</span>
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Protected by 256-bit SSL encryption &amp; client-isolated data security.</span>
               </div>
             </div>
           </motion.div>
@@ -563,7 +563,7 @@ export default function ClientPortalPage() {
         {/* Reset Passcode Modal */}
         {showResetModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#202020] border border-[#383838] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="bg-[#0e1526] border border-slate-800 rounded-xl p-6 w-full max-w-sm shadow-2xl">
               <h3 className="text-base font-bold text-white mb-2">Reset Client Passcode</h3>
               <p className="text-xs text-slate-400 mb-4">
                 Enter your registered client email to generate a new secure access passcode.
@@ -613,16 +613,18 @@ export default function ClientPortalPage() {
     : 0
 
   return (
-    <div className="min-h-screen bg-[#181818] text-[#F5F5F5] selection:bg-[#0D99FF]/20 selection:text-[#0D99FF] flex flex-col">
+    <div className="min-h-screen bg-[#090d16] text-slate-100 selection:bg-blue-600/20 selection:text-blue-500 flex flex-col">
       {/* ── Top Navigation Bar ── */}
-      <header className="sticky top-0 z-40 bg-[#202020]/90 backdrop-blur-md border-b border-[#333333]">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="CapeSecure" className="w-10 h-10 rounded-xl object-contain drop-shadow" />
+      <header className="sticky top-0 z-40 bg-[#0e1526]/90 backdrop-blur-md border-b border-slate-800/80">
+        <div className="max-w-7xl mx-auto px-6 h-15 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-xs">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm tracking-tight text-white">CapeSecure</span>
-                <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-[#0D99FF]/15 text-[#0D99FF] border border-[#0D99FF]/30">
+                <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
                   Client Portal
                 </span>
               </div>
@@ -632,7 +634,7 @@ export default function ClientPortalPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="hidden sm:flex flex-col text-right">
               <span className="text-xs font-semibold text-white">{sessionClient.name}</span>
               <span className="text-[10px] text-slate-400 font-mono">
@@ -643,14 +645,14 @@ export default function ClientPortalPage() {
             <button
               onClick={() => loadClientData(sessionClient.id)}
               title="Refresh Data"
-              className="p-2 rounded-lg bg-[#282828] hover:bg-[#333333] text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg bg-[#131c31] hover:bg-[#1a253f] border border-slate-800 text-slate-300 hover:text-white transition-colors"
             >
-              <RefreshCw className={`w-4 h-4 ${loadingData ? 'animate-spin text-[#0D99FF]' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? 'animate-spin text-blue-400' : ''}`} />
             </button>
 
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/25 transition-all"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sign Out</span>
@@ -659,7 +661,7 @@ export default function ClientPortalPage() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-6 flex items-center gap-1 overflow-x-auto scrollbar-none border-t border-[#2A2A2A]">
+        <div className="max-w-7xl mx-auto px-6 flex items-center gap-1 overflow-x-auto scrollbar-none border-t border-slate-800/60">
           {[
             { id: 'overview', label: 'Project Progress', icon: Layers },
             { id: 'quotations', label: `Quotations (${clientQuotations.length})`, icon: FileText },
@@ -677,13 +679,13 @@ export default function ClientPortalPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as PortalTab)}
-                className={`flex items-center gap-2 py-3 px-3.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-all ${
+                className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-medium whitespace-nowrap border-b-2 transition-all ${
                   isActive
-                    ? 'border-[#0D99FF] text-[#0D99FF]'
-                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
               </button>
             )

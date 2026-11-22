@@ -7,25 +7,25 @@ export default function AppLayout() {
   const location = useLocation()
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F5F5F5] dark:bg-[#1E1E1E] text-[#1E1E1E] dark:text-[#F5F5F5]">
-      {/* Figma Layers Panel Sidebar */}
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100">
+      {/* Precision SaaS Sidebar Navigation */}
       <Sidebar />
 
-      {/* Main Canvas Area */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Figma Top Navigation Bar */}
+      {/* Main Content Workspace */}
+      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+        {/* Top Header & Fast Action Bar */}
         <TopNav />
 
-        {/* Canvas Body with subtle Figma dot grid */}
-        <main className="flex-1 overflow-y-auto figma-canvas-dots p-6">
-          <div className="max-w-7xl mx-auto">
+        {/* Workspace Canvas */}
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-7xl mx-auto space-y-6">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
               >
                 <Outlet />
               </motion.div>

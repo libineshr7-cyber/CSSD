@@ -6,7 +6,7 @@ import {
   TrendingUp, TrendingDown, Users, Briefcase, CreditCard, LifeBuoy,
   ArrowRight, Clock, CheckCircle2, AlertCircle, Circle, Plus,
   Layers, Download, Sparkles, Filter, ExternalLink, ShieldCheck,
-  RefreshCw
+  RefreshCw, FileText
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
@@ -21,98 +21,84 @@ function greeting() {
   return 'Good evening'
 }
 
-const statusColors: Record<string, string> = {
-  new: 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-[#333333]',
-  contacted: 'text-[#0D99FF] bg-[#0D99FF]/10',
-  qualified: 'text-[#A259FF] bg-[#A259FF]/10',
-  proposal: 'text-[#FFC700] bg-[#FFC700]/15 dark:text-[#FFC700]',
-  won: 'text-[#0ACF83] bg-[#0ACF83]/10',
-  lost: 'text-[#F24E1E] bg-[#F24E1E]/10',
+const statusBadges: Record<string, { label: string; badge: string; dot: string }> = {
+  new:       { label: 'New',       badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700', dot: 'bg-slate-400' },
+  contacted: { label: 'Contacted', badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', dot: 'bg-blue-500' },
+  qualified: { label: 'Qualified', badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', dot: 'bg-indigo-500' },
+  proposal:  { label: 'Proposal',  badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20', dot: 'bg-amber-500' },
+  won:       { label: 'Won',       badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-500' },
+  lost:      { label: 'Lost',      badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20', dot: 'bg-rose-500' },
 }
 
-const projectStatusColors: Record<string, string> = {
-  development: 'text-[#0D99FF] bg-[#0D99FF]/10 border-[#0D99FF]/20',
-  design: 'text-[#A259FF] bg-[#A259FF]/10 border-[#A259FF]/20',
-  review: 'text-[#FFC700] bg-[#FFC700]/15 border-[#FFC700]/25 dark:text-[#FFC700]',
-  planning: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200',
-  testing: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30 border-amber-200',
-  paused: 'text-slate-500 bg-slate-100 dark:bg-[#333333] border-slate-300 dark:border-slate-700',
-  completed: 'text-[#0ACF83] bg-[#0ACF83]/10 border-[#0ACF83]/20',
+const projectPhaseStyles: Record<string, { badge: string; bar: string }> = {
+  development: { badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20', bar: 'bg-blue-600' },
+  design:      { badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', bar: 'bg-indigo-600' },
+  review:      { badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20', bar: 'bg-amber-500' },
+  planning:    { badge: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20', bar: 'bg-slate-500' },
+  testing:     { badge: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20', bar: 'bg-teal-500' },
+  completed:   { badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', bar: 'bg-emerald-600' },
+  paused:      { badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20', bar: 'bg-rose-500' },
 }
 
-const projectProgressColors: Record<string, string> = {
-  development: 'bg-[#0D99FF]',
-  design: 'bg-[#A259FF]',
-  review: 'bg-[#FFC700]',
-  planning: 'bg-indigo-500',
-  testing: 'bg-amber-500',
-  paused: 'bg-slate-400 dark:bg-slate-600',
-  completed: 'bg-[#0ACF83]',
-}
-
-// ─── Custom Tooltip ──────────────────────────────────────────
+// ─── Custom Fintech Chart Tooltip ──────────────────────────────────────────
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-xl px-3.5 py-2.5 shadow-xl text-xs">
-        <p className="text-slate-400 text-[11px] font-medium mb-0.5">{label} 2026</p>
-        <p className="text-[#0D99FF] font-bold text-sm">{formatCurrency(payload[0].value)}</p>
+      <div className="bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 shadow-dropdown text-xs">
+        <p className="text-slate-400 text-[10px] uppercase font-semibold tracking-wider mb-0.5">{label} 2026</p>
+        <p className="text-slate-900 dark:text-slate-100 font-mono font-semibold text-sm">
+          {formatCurrency(payload[0].value)}
+        </p>
       </div>
     )
   }
   return null
 }
 
-// ─── Interactive Stat Card ─────────────────────────────────────────
+// ─── High-Density Fintech Stat Card ────────────────────────────────────────
 interface StatCardProps {
   label: string
   value: string
   icon: React.ReactNode
-  iconBg: string
   trend: number
   trendLabel: string
-  accentBorder?: string
 }
 
-function StatCard({ label, value, icon, iconBg, trend, trendLabel, accentBorder }: StatCardProps) {
+function StatCard({ label, value, icon, trend, trendLabel }: StatCardProps) {
   const isPositive = trend >= 0
   return (
-    <motion.div
-      whileHover={{ y: -3, transition: { duration: 0.15 } }}
-      className={`relative bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-all overflow-hidden group ${accentBorder || ''}`}
-    >
+    <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-4 shadow-xs hover:border-slate-300 dark:hover:border-slate-700/80 transition-all flex flex-col justify-between">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-slate-500 dark:text-slate-400 text-[11px] font-semibold uppercase tracking-wider">
+          <span className="text-slate-500 dark:text-slate-400 text-[10px] font-semibold uppercase tracking-wider">
             {label}
-          </p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-[#F5F5F5] mt-1.5 tracking-tight font-sans">
+          </span>
+          <p className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 mt-1 tracking-tight">
             {value}
           </p>
         </div>
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${iconBg}`}>
+        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0">
           {icon}
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 mt-4 pt-3 border-t border-[#F0F0F0] dark:border-[#383838]">
+      <div className="flex items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/70 text-[11px]">
         {isPositive ? (
-          <TrendingUp className="w-3.5 h-3.5 text-[#0ACF83]" />
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
         ) : (
-          <TrendingDown className="w-3.5 h-3.5 text-[#F24E1E]" />
+          <TrendingDown className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
         )}
-        <span className={`text-xs font-semibold ${isPositive ? 'text-[#0ACF83]' : 'text-[#F24E1E]'}`}>
+        <span className={`font-semibold font-mono ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
           {isPositive ? '+' : ''}{trend}%
         </span>
-        <span className="text-slate-400 text-xs">{trendLabel}</span>
+        <span className="text-slate-400">{trendLabel}</span>
       </div>
-    </motion.div>
+    </div>
   )
 }
 
-// ─── Main Component ────────────────────────────────────────────────
+// ─── Main Overview Page ────────────────────────────────────────────────────
 export default function OverviewPage() {
-  const [timeRange, setTimeRange] = useState<'7D' | '30D' | '90D' | '1Y'>('30D')
   const [loading, setLoading] = useState(true)
 
   // Real-time Database State
@@ -160,7 +146,6 @@ export default function OverviewPage() {
   useEffect(() => {
     loadDashboardData()
 
-    // Subscribe to live changes across core tables
     const channel = supabase.channel('capesecure-overview-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => loadDashboardData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => loadDashboardData())
@@ -174,7 +159,7 @@ export default function OverviewPage() {
     }
   }, [])
 
-  // Dynamic calculations from real database
+  // Calculations
   const activeProjects = useMemo(() => projects.filter(p => p.status !== 'cancelled'), [projects])
   const activeClients  = useMemo(() => clients.filter(c => c.status === 'active'), [clients])
   const openTickets    = useMemo(() => tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed'), [tickets])
@@ -182,10 +167,7 @@ export default function OverviewPage() {
     () => payments.filter(p => p.status === 'received').reduce((s, p) => s + (Number(p.amount) || 0), 0),
     [payments]
   )
-  const pendingPayments = useMemo(() => payments.filter(p => p.status === 'pending'), [payments])
-  const recentPayments  = useMemo(() => payments.filter(p => p.status === 'received'), [payments])
   const topLeads = useMemo(() => leads.filter(l => l.status !== 'lost').slice(0, 5), [leads])
-
   const clientMap = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients])
 
   const recentActivity = useMemo(() => {
@@ -196,7 +178,6 @@ export default function OverviewPage() {
       date: t.updated_at,
       type: 'task' as const,
       status: t.status,
-      priority: t.priority,
     }))
     const ticketEvents = tickets.map(t => ({
       id: t.id,
@@ -205,190 +186,147 @@ export default function OverviewPage() {
       date: t.updated_at,
       type: 'ticket' as const,
       status: t.status,
-      priority: t.priority,
     }))
     return [...taskEvents, ...ticketEvents]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 6)
   }, [tasks, tickets])
 
-  // Real-time Revenue Chart (constructed dynamically from live payments or 0 baseline)
   const dynamicRevenueData = useMemo(() => {
-    const months = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov']
-    const currentMonthRev = receivedTotal
     return [
       { month: 'Jun', revenue: 0 },
       { month: 'Jul', revenue: 0 },
       { month: 'Aug', revenue: 0 },
       { month: 'Sep', revenue: 0 },
       { month: 'Oct', revenue: 0 },
-      { month: 'Nov', revenue: currentMonthRev },
+      { month: 'Nov', revenue: receivedTotal },
     ]
   }, [receivedTotal])
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
-      {/* ── Real-Time Workspace Header ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[#E5E5E5] dark:border-[#383838]">
-        <div className="flex items-center gap-3">
-          <img
-            src="/logo.png"
-            alt="CapeSecure Official Logo"
-            className="w-11 h-11 rounded-full object-contain drop-shadow-md hover:scale-105 transition-transform flex-shrink-0"
-          />
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-900 dark:text-[#F5F5F5] tracking-tight">
-                {greeting()}, Admin
-              </h1>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#0ACF83]/10 text-[#0ACF83] border border-[#0ACF83]/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#0ACF83] animate-pulse" /> Live Supabase Connected
-              </span>
-            </div>
-            <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-              {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · CapeSecure Production Management
-            </p>
+    <div className="space-y-6 animate-fade-in pb-10">
+      
+      {/* ── Executive Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              {greeting()}, Admin
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Telemetry
+            </span>
           </div>
+          <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · CapeSecure Operations Executive Overview
+          </p>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
           <button
             onClick={loadDashboardData}
-            className="btn-ghost p-1.5 text-slate-500"
+            className="btn-secondary text-xs"
             title="Refresh Real-time Data"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
           </button>
 
-          <Link
-            to="/admin/projects"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0D99FF] hover:bg-[#007BE5] text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
-          >
+          <Link to="/admin/projects" className="btn-primary text-xs">
             <Plus className="w-3.5 h-3.5" />
             <span>New Project</span>
           </Link>
         </div>
       </div>
 
-      {/* ── Stat Cards (Live Database Driven) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* ── 4-Card KPI Matrix ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Realized Revenue"
           value={formatCurrency(receivedTotal)}
-          icon={<CreditCard className="w-5 h-5 text-[#0ACF83]" />}
-          iconBg="bg-[#0ACF83]/10"
+          icon={<CreditCard className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
           trend={receivedTotal > 0 ? 100 : 0}
-          trendLabel="live cleared payments"
-          accentBorder="hover:border-[#0ACF83]/40"
+          trendLabel="settled funds"
         />
         <StatCard
           label="Active Projects"
           value={String(activeProjects.length)}
-          icon={<Briefcase className="w-5 h-5 text-[#0D99FF]" />}
-          iconBg="bg-[#0D99FF]/10"
+          icon={<Briefcase className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
           trend={activeProjects.length}
-          trendLabel="in active lifecycle"
-          accentBorder="hover:border-[#0D99FF]/40"
+          trendLabel="in active pipeline"
         />
         <StatCard
-          label="Total Client Accounts"
+          label="Client Accounts"
           value={String(clients.length)}
-          icon={<Users className="w-5 h-5 text-[#A259FF]" />}
-          iconBg="bg-[#A259FF]/10"
+          icon={<Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
           trend={activeClients.length}
-          trendLabel="active corporate accounts"
-          accentBorder="hover:border-[#A259FF]/40"
+          trendLabel="active corporate clients"
         />
         <StatCard
-          label="Open Support Tickets"
+          label="Support Tickets"
           value={String(openTickets.length)}
-          icon={<LifeBuoy className="w-5 h-5 text-[#FFC700]" />}
-          iconBg="bg-[#FFC700]/15"
+          icon={<LifeBuoy className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
           trend={openTickets.length}
-          trendLabel="pending resolution"
-          accentBorder="hover:border-[#FFC700]/40"
+          trendLabel="awaiting resolution"
         />
       </div>
 
-      {/* ── Empty Database Real-Time Quickstart Banner ── */}
-      {clients.length === 0 && leads.length === 0 && (
-        <div className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-emerald-500/10 border border-blue-500/20 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-blue-500" />
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              Live Real-Time Database Initialized & Ready
-            </h3>
-          </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl leading-relaxed">
-            All fake mockup data has been eliminated. The system is connected directly to your CapeSecure Supabase PostgreSQL database. Create your first real lead or client to begin managing their lifecycle.
-          </p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Link to="/admin/leads" className="btn-primary text-xs">
-              <Plus className="w-3.5 h-3.5" /> Create First Lead
-            </Link>
-            <Link to="/admin/clients" className="btn-secondary text-xs">
-              <Users className="w-3.5 h-3.5" /> Add Client Account
-            </Link>
-            <Link to="/admin/quotations" className="btn-secondary text-xs">
-              <CreditCard className="w-3.5 h-3.5" /> Create Quotation
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* ── Real Revenue Chart & Lifecycle Activity ── */}
+      {/* ── Split: Revenue Trajectory & Live Event Stream ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Revenue Analytics */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl p-5 shadow-xs">
+        
+        {/* Revenue Analytics Chart */}
+        <div className="lg:col-span-2 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-slate-900 dark:text-[#F5F5F5] font-semibold text-sm">
+              <h2 className="text-slate-900 dark:text-slate-100 font-semibold text-sm">
                 Cleared Revenue Trajectory
               </h2>
-              <p className="text-slate-400 text-xs mt-0.5">Live cleared client settlements (INR ₹)</p>
+              <p className="text-slate-400 text-xs mt-0.5">Verified bank settlements (INR ₹)</p>
             </div>
-            <span className="text-xs font-mono font-bold text-[#0ACF83] bg-[#0ACF83]/10 px-2.5 py-1 rounded-full border border-[#0ACF83]/20">
-              Total: {formatCurrency(receivedTotal)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
+                Total: {formatCurrency(receivedTotal)}
+              </span>
+            </div>
           </div>
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dynamicRevenueData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-xs fill-slate-400" />
-                <YAxis tickLine={false} axisLine={false} className="text-xs fill-slate-400" tickFormatter={v => `₹${v}`} />
+              <BarChart data={dynamicRevenueData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-100 dark:text-slate-800" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-[11px] fill-slate-400 font-mono" />
+                <YAxis tickLine={false} axisLine={false} className="text-[11px] fill-slate-400 font-mono" tickFormatter={v => `₹${v}`} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="revenue" fill="#0D99FF" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="revenue" fill="#2563eb" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Live Activity Stream */}
-        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+        {/* Live Operational Events */}
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-slate-900 dark:text-[#F5F5F5] font-semibold text-sm">Recent Operational Events</h2>
-              <span className="text-[10px] font-mono text-slate-400">Live Logs</span>
+              <h2 className="text-slate-900 dark:text-slate-100 font-semibold text-sm">Live Operational Stream</h2>
+              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-slate-400">Events</span>
             </div>
 
             {recentActivity.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs">
                 <Clock className="w-6 h-6 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-                No events logged yet. Real activity appears as tasks and tickets progress.
+                No events recorded yet. Updates appear as tasks and tickets progress.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {recentActivity.map(act => (
-                  <div key={act.id} className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-slate-800 text-xs">
-                    <div className="w-6 h-6 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                  <div key={act.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50 dark:bg-[#0b101d] border border-slate-100 dark:border-slate-800/80 text-xs">
+                    <div className="w-6 h-6 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
                       <Layers className="w-3.5 h-3.5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{act.title}</p>
-                      <p className="text-[10px] text-slate-400">{act.subtitle} • {formatDate(act.date)}</p>
+                      <p className="font-medium text-slate-900 dark:text-slate-100 truncate">{act.title}</p>
+                      <p className="text-[10px] text-slate-400">{act.subtitle} · {formatDate(act.date)}</p>
                     </div>
                   </div>
                 ))}
@@ -396,19 +334,20 @@ export default function OverviewPage() {
             )}
           </div>
 
-          <Link to="/admin/tasks" className="text-xs font-semibold text-blue-500 hover:underline flex items-center gap-1 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
+          <Link to="/admin/tasks" className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
             Manage All Tasks <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>
 
-      {/* ── Active Projects & Financial Pipeline ── */}
+      {/* ── Active Projects & Financial Settlements ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Projects in Delivery */}
-        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl p-5 shadow-xs">
+        
+        {/* Projects Pipeline */}
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-slate-900 dark:text-[#F5F5F5] font-semibold text-sm">Active Development Projects</h2>
-            <Link to="/admin/projects" className="text-xs font-semibold text-[#0D99FF] hover:underline flex items-center gap-1">
+            <h2 className="text-slate-900 dark:text-slate-100 font-semibold text-sm">Active Development Projects</h2>
+            <Link to="/admin/projects" className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
               View all ({projects.length}) <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -416,42 +355,45 @@ export default function OverviewPage() {
           {projects.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
               <Briefcase className="w-6 h-6 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-              No projects created yet. Convert an approved quotation to initialize a project.
+              No projects initialized yet. Approved quotations transition automatically.
             </div>
           ) : (
             <div className="space-y-3">
-              {projects.slice(0, 4).map(p => (
-                <div key={p.id} className="p-3 rounded-xl bg-slate-50 dark:bg-[#252525] border border-slate-200 dark:border-[#383838]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${projectStatusColors[p.status] || 'text-slate-500'}`}>
-                          {p.status}
-                        </span>
-                        <span className="text-[10px] text-slate-400">Due {formatDate(p.deadline)}</span>
+              {projects.slice(0, 4).map(p => {
+                const style = projectPhaseStyles[p.status] || projectPhaseStyles.development
+                return (
+                  <div key={p.id} className="p-3 rounded-lg bg-slate-50 dark:bg-[#0b101d] border border-slate-200/80 dark:border-slate-800/80">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs">{p.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md border font-medium ${style.badge}`}>
+                            {p.status}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">Due {formatDate(p.deadline)}</span>
+                        </div>
                       </div>
+                      <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">{p.progress}%</span>
                     </div>
-                    <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{p.progress}%</span>
-                  </div>
 
-                  <div className="h-1.5 bg-slate-200 dark:bg-[#383838] rounded-full overflow-hidden mt-2.5">
-                    <div
-                      className={`h-full ${projectProgressColors[p.status] || 'bg-blue-500'}`}
-                      style={{ width: `${p.progress}%` }}
-                    />
+                    <div className="h-1 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-2.5">
+                      <div
+                        className={`h-full ${style.bar}`}
+                        style={{ width: `${p.progress}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
 
-        {/* Financial Pipeline (Cleared & Pending) */}
-        <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl p-5 shadow-xs">
+        {/* Financial Pipeline */}
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-slate-900 dark:text-[#F5F5F5] font-semibold text-sm">Financial Settlements</h2>
-            <Link to="/admin/payments" className="text-xs font-semibold text-[#0D99FF] hover:underline flex items-center gap-1">
+            <h2 className="text-slate-900 dark:text-slate-100 font-semibold text-sm">Recent Financial Settlements</h2>
+            <Link to="/admin/payments" className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
               View all ({payments.length}) <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -459,21 +401,21 @@ export default function OverviewPage() {
           {payments.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
               <CreditCard className="w-6 h-6 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-              No payment transactions recorded yet. Advance and milestone receipts will appear here.
+              No settlement transactions recorded yet.
             </div>
           ) : (
             <div className="space-y-2">
               {payments.slice(0, 4).map(pay => {
                 const client = clientMap[pay.client_id]
                 return (
-                  <div key={pay.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-[#252525] border border-slate-100 dark:border-slate-800 text-xs">
+                  <div key={pay.id} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-[#0b101d] border border-slate-100 dark:border-slate-800 text-xs">
                     <div>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">{client?.name || pay.reference}</p>
-                      <p className="text-[10px] text-slate-400 capitalize">{pay.payment_type} • {pay.payment_method.replace('_', ' ')}</p>
+                      <p className="font-medium text-slate-900 dark:text-slate-100">{client?.name || pay.reference}</p>
+                      <p className="text-[10px] text-slate-400 capitalize">{pay.payment_type} · {pay.payment_method.replace('_', ' ')}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(pay.amount)}</p>
-                      <span className="text-[9px] uppercase font-semibold text-slate-400">{pay.status}</span>
+                      <p className="font-semibold font-mono text-emerald-600 dark:text-emerald-400">{formatCurrency(pay.amount)}</p>
+                      <span className="text-[9px] uppercase font-mono font-medium text-slate-400">{pay.status}</span>
                     </div>
                   </div>
                 )
@@ -483,54 +425,60 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* ── Active Leads Pipeline ── */}
-      <div className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl p-5 shadow-xs">
+      {/* ── Active Leads Pipeline Table ── */}
+      <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-5 shadow-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-slate-900 dark:text-[#F5F5F5] font-semibold text-sm">Active Enquiries & Leads</h2>
-            <p className="text-slate-400 text-xs mt-0.5">Prospects entering the client acquisition funnel</p>
+            <h2 className="text-slate-900 dark:text-slate-100 font-semibold text-sm">Active Enquiries & Leads</h2>
+            <p className="text-slate-400 text-xs mt-0.5">Commercial acquisition pipeline</p>
           </div>
-          <Link to="/admin/leads" className="text-xs font-semibold text-[#0D99FF] hover:underline flex items-center gap-1">
+          <Link to="/admin/leads" className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
             Open Leads ({leads.length}) <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         {leads.length === 0 ? (
-          <div className="py-10 text-center text-slate-400 text-xs">
+          <div className="py-8 text-center text-slate-400 text-xs">
             <Users className="w-6 h-6 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-            No active leads in pipeline. Create a new lead enquiry to begin the acquisition workflow.
+            No active enquiries in pipeline.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+          <div className="table-wrapper">
+            <table className="table">
               <thead>
-                <tr className="border-b border-[#E5E5E5] dark:border-[#383838] text-slate-400 text-[11px]">
-                  <th className="text-left pb-2 pr-4 font-semibold uppercase">Lead Contact</th>
-                  <th className="text-left pb-2 pr-4 font-semibold uppercase">Company</th>
-                  <th className="text-left pb-2 pr-4 font-semibold uppercase">Source</th>
-                  <th className="text-left pb-2 pr-4 font-semibold uppercase">Status</th>
-                  <th className="text-right pb-2 pr-4 font-semibold uppercase">Budget</th>
-                  <th className="text-left pb-2 font-semibold uppercase">Created</th>
+                <tr>
+                  <th>Lead Contact</th>
+                  <th>Company</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th className="text-right">Budget</th>
+                  <th>Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0F0F0] dark:divide-[#383838]">
-                {topLeads.map(lead => (
-                  <tr key={lead.id} className="hover:bg-slate-50 dark:hover:bg-[#252525]">
-                    <td className="py-2.5 pr-4">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">{lead.name}</div>
-                      <div className="text-[10px] text-slate-400">{lead.email}</div>
-                    </td>
-                    <td className="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{lead.company || '—'}</td>
-                    <td className="py-2.5 pr-4 capitalize text-slate-500">{lead.source}</td>
-                    <td className="py-2.5 pr-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusColors[lead.status] || 'bg-slate-100 text-slate-600'}`}>
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 pr-4 text-right font-semibold text-slate-900 dark:text-slate-100">{lead.budget ? formatCurrency(lead.budget) : '—'}</td>
-                    <td className="py-2.5 text-slate-400">{formatDate(lead.created_at)}</td>
-                  </tr>
-                ))}
+              <tbody>
+                {topLeads.map(lead => {
+                  const badge = statusBadges[lead.status] || statusBadges.new
+                  return (
+                    <tr key={lead.id}>
+                      <td>
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">{lead.name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{lead.email}</div>
+                      </td>
+                      <td className="text-slate-600 dark:text-slate-300">{lead.company || '—'}</td>
+                      <td className="capitalize text-slate-500">{lead.source}</td>
+                      <td>
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium border ${badge.badge}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="text-right font-mono font-semibold text-slate-900 dark:text-slate-100">
+                        {lead.budget ? formatCurrency(lead.budget) : '—'}
+                      </td>
+                      <td className="text-slate-400 font-mono text-[11px]">{formatDate(lead.created_at)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

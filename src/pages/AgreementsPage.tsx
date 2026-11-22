@@ -385,16 +385,16 @@ export default function AgreementsPage() {
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              Agreements & Digital Signing
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+              Agreements & Digital Execution
             </h1>
-            <span className="badge-blue text-xs font-mono">Phase 5</span>
+            <span className="badge-blue text-[11px] font-mono">17-Section MSA</span>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
-            17-section legally binding contracts, e-sign provider integration (Zoho Sign / Leegality), physical custody archive, and real PDF generation.
+          <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+            Legally binding MSAs, certified e-sign integration (Zoho Sign / Leegality), physical custody log, and SHA-256 evidence.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -402,56 +402,56 @@ export default function AgreementsPage() {
             onClick={() => setShowCreateModal(true)}
             className="btn-primary"
           >
-            <Plus className="w-4 h-4" />
-            Create Agreement
+            <Plus className="w-3.5 h-3.5" />
+            <span>Create Agreement</span>
           </button>
         </div>
       </div>
 
       {/* Compliance Notice */}
-      <div className="bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 rounded-xl p-3.5 flex items-start gap-3">
-        <ShieldCheck className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
-        <div className="text-xs text-sky-900 dark:text-sky-200 leading-relaxed">
-          <strong className="font-semibold">Legal & Cryptographic Signature Policy:</strong> CapeSecure enforces strictly verified digital signatures through certified e-sign providers (Zoho Sign, Leegality, DocuSign) with SHA-256 audit evidence, or verified physical signing with custody chain tracking. Typed names and uploaded images are never treated as verified digital signatures.
+      <div className="bg-slate-50 dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-3.5 flex items-start gap-3 shadow-xs">
+        <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+        <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+          <strong className="font-semibold text-slate-900 dark:text-slate-100">Legal & Cryptographic Signature Policy:</strong> CapeSecure enforces strictly verified digital signatures through certified e-sign providers (Zoho Sign, Leegality, DocuSign) with SHA-256 audit evidence, or verified physical signing with custody chain tracking. Typed names and uploaded images are never treated as verified digital signatures.
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-4 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-            <span className="text-xs uppercase font-medium">Total Contract Value</span>
+            <span className="text-[10px] uppercase font-semibold tracking-wider">Total Contract Value</span>
             <FileSignature className="w-4 h-4 text-blue-500" />
           </div>
-          <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(stats.totalVal)}</p>
-          <span className="text-xs text-slate-400 mt-1 block">{stats.total} total agreements</span>
+          <p className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100">{formatCurrency(stats.totalVal)}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block font-mono">{stats.total} total agreements</span>
         </div>
 
-        <div className="card p-4">
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-4 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-            <span className="text-xs uppercase font-medium">Fully Executed</span>
+            <span className="text-[10px] uppercase font-semibold tracking-wider">Fully Executed</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
-          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{stats.signed}</p>
-          <span className="text-xs text-slate-400 mt-1 block">Legally binding</span>
+          <p className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{stats.signed}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block">Legally binding</span>
         </div>
 
-        <div className="card p-4">
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-4 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-            <span className="text-xs uppercase font-medium">Sent for Signature</span>
+            <span className="text-[10px] uppercase font-semibold tracking-wider">Sent for Signature</span>
             <Clock className="w-4 h-4 text-blue-500" />
           </div>
-          <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{stats.sent}</p>
-          <span className="text-xs text-slate-400 mt-1 block">Awaiting client e-sign</span>
+          <p className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400">{stats.sent}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block">Awaiting client e-sign</span>
         </div>
 
-        <div className="card p-4">
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-4 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
-            <span className="text-xs uppercase font-medium">Draft Preparation</span>
+            <span className="text-[10px] uppercase font-semibold tracking-wider">Draft Preparation</span>
             <FileCheck className="w-4 h-4 text-amber-500" />
           </div>
-          <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.draft}</p>
-          <span className="text-xs text-slate-400 mt-1 block">Ready for dispatch</span>
+          <p className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400">{stats.draft}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block">Ready for dispatch</span>
         </div>
       </div>
 

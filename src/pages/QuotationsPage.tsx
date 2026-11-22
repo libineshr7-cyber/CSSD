@@ -15,15 +15,15 @@ import type { Quotation, QuotationItem, QuotationStatus, Client, PaymentMileston
 // ─── Status Configuration ─────────────────────────────────────────────────────
 
 export const QUOTE_STATUS_CONFIG: Record<string, { label: string; badge: string; dot: string }> = {
-  draft:              { label: 'Draft',              badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',     dot: 'bg-slate-400' },
-  sent:               { label: 'Sent',               badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',       dot: 'bg-blue-500' },
-  viewed:             { label: 'Viewed by Client',   badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20', dot: 'bg-purple-500' },
-  under_discussion:   { label: 'Under Discussion',   badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',   dot: 'bg-amber-500' },
-  revision_requested: { label: 'Revision Requested', badge: 'bg-rose-500/10 text-rose-400 border-rose-500/20',     dot: 'bg-rose-500' },
-  approved:           { label: 'Approved',           badge: 'bg-green-500/10 text-green-400 border-green-500/20',   dot: 'bg-green-500' },
-  accepted:           { label: 'Approved',           badge: 'bg-green-500/10 text-green-400 border-green-500/20',   dot: 'bg-green-500' },
-  rejected:           { label: 'Rejected',           badge: 'bg-red-500/10 text-red-400 border-red-500/20',         dot: 'bg-red-500' },
-  expired:            { label: 'Expired',            badge: 'bg-slate-600/10 text-slate-500 border-slate-600/20',   dot: 'bg-slate-500' },
+  draft:              { label: 'Draft',              badge: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',     dot: 'bg-slate-400' },
+  sent:               { label: 'Sent',               badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',         dot: 'bg-blue-500' },
+  viewed:             { label: 'Viewed by Client',   badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20', dot: 'bg-indigo-500' },
+  under_discussion:   { label: 'Under Discussion',   badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',     dot: 'bg-amber-500' },
+  revision_requested: { label: 'Revision Requested', badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',       dot: 'bg-rose-500' },
+  approved:           { label: 'Approved',           badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-500' },
+  accepted:           { label: 'Approved',           badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-500' },
+  rejected:           { label: 'Rejected',           badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',         dot: 'bg-rose-500' },
+  expired:            { label: 'Expired',            badge: 'bg-slate-600/10 text-slate-500 border-slate-600/20',                         dot: 'bg-slate-500' },
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -384,54 +384,55 @@ export default function QuotationsPage() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Professional Quotation Management</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Create sequential quotations, track client approval status, generate revised versions, and export branded PDFs.
+            Sequential quotations, client approval tracking, revisions, and GST-compliant commercial proposals.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={loadQuotations}
-            className="p-1.5 rounded-lg border border-[#E5E5E5] dark:border-[#383838] bg-white dark:bg-[#1E1E1E] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+            className="btn-secondary"
             title="Refresh quotations"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
           </button>
 
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="px-3 py-1.5 bg-[#0D99FF] hover:bg-[#0D99FF]/90 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm"
+            className="btn-primary"
           >
             <Plus className="w-3.5 h-3.5" />
-            Create Quotation
+            <span>Create Quotation</span>
           </button>
         </div>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Total Quotations</div>
-          <div className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">{stats.totalQuotes}</div>
+        <div className="p-3.5 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-xs">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Total Quotations</div>
+          <div className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1">{stats.totalQuotes}</div>
         </div>
 
-        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">In Discussion / Sent</div>
-          <div className="text-xl font-bold text-blue-500 mt-1">{stats.activeDiscussion}</div>
+        <div className="p-3.5 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-xs">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">In Discussion / Sent</div>
+          <div className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">{stats.activeDiscussion}</div>
         </div>
 
-        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Approved Proposals</div>
-          <div className="text-xl font-bold text-green-500 mt-1">{stats.approvedQuotes}</div>
+        <div className="p-3.5 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-xs">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Approved Proposals</div>
+          <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">{stats.approvedQuotes}</div>
         </div>
 
-        <div className="p-3.5 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-medium">Approved Pipeline Value</div>
-          <div className="text-xl font-bold text-[#0D99FF] mt-1">{formatCurrency(stats.approvedValue)}</div>
+        <div className="p-3.5 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl shadow-xs">
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Approved Pipeline Value</div>
+          <div className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">{formatCurrency(stats.approvedValue)}</div>
         </div>
       </div>
 
       {/* Search and Filters Bar */}
-      <div className="p-3 bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl space-y-3">
+      <div className="p-3 bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl space-y-3 shadow-xs">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -440,7 +441,7 @@ export default function QuotationsPage() {
               placeholder="Search by quote number (CS-QTN-2026-001), project title, client..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1) }}
-              className="w-full pl-9 pr-3 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0D99FF]"
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-[#0b101d] border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1.5 focus:ring-blue-600 focus:border-blue-600"
             />
           </div>
 
@@ -448,7 +449,7 @@ export default function QuotationsPage() {
             <select
               value={clientFilter}
               onChange={e => { setClientFilter(e.target.value); setPage(1) }}
-              className="px-2.5 py-1.5 bg-[#F9FAFB] dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none max-w-[180px] truncate"
+              className="px-2.5 py-1.5 bg-slate-50 dark:bg-[#0b101d] border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none max-w-[180px] truncate"
             >
               <option value="all">All Clients</option>
               {clients.map(c => (
@@ -459,7 +460,7 @@ export default function QuotationsPage() {
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-[#E5E5E5] dark:border-[#2D2D2D] pt-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-slate-200/80 dark:border-slate-800/80 pt-2">
           {['all', 'draft', 'sent', 'viewed', 'under_discussion', 'revision_requested', 'approved', 'rejected'].map(st => {
             const count = st === 'all'
               ? quotations.length
@@ -470,10 +471,10 @@ export default function QuotationsPage() {
               <button
                 key={st}
                 onClick={() => { setStatusFilter(st); setPage(1) }}
-                className={`px-2.5 py-1 rounded-md font-semibold capitalize transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-md font-medium capitalize transition-colors whitespace-nowrap flex items-center gap-1.5 text-xs ${
                   statusFilter === st
-                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#282828]'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 {cfg && <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />}
@@ -485,7 +486,7 @@ export default function QuotationsPage() {
       </div>
 
       {/* Quotations Table */}
-      <div className="bg-white dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#2D2D2D] rounded-xl overflow-hidden shadow-sm">
+      <div className="table-wrapper">
         {paginated.length === 0 ? (
           <div className="py-16 text-center">
             <FileText className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
@@ -495,26 +496,26 @@ export default function QuotationsPage() {
             </p>
             <button
               onClick={() => setCreateModalOpen(true)}
-              className="mt-4 px-3 py-1.5 bg-[#0D99FF] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5"
+              className="mt-4 btn-primary"
             >
-              <Plus className="w-3.5 h-3.5" /> Create Quotation
+              <Plus className="w-3.5 h-3.5" /> <span>Create Quotation</span>
             </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="table">
               <thead>
-                <tr className="border-b border-[#E5E5E5] dark:border-[#2D2D2D] bg-[#F9FAFB] dark:bg-[#252525] text-slate-500 dark:text-slate-400 font-medium">
-                  <th className="py-2.5 px-4">Quote Number</th>
-                  <th className="py-2.5 px-4">Project Title & Client</th>
-                  <th className="py-2.5 px-4">Status</th>
-                  <th className="py-2.5 px-4">Total Amount</th>
-                  <th className="py-2.5 px-4">Advance Term</th>
-                  <th className="py-2.5 px-4">Valid Until</th>
-                  <th className="py-2.5 px-4 text-right">Actions</th>
+                <tr>
+                  <th>Quote Number</th>
+                  <th>Project Title & Client</th>
+                  <th>Status</th>
+                  <th>Total Amount</th>
+                  <th>Advance Term</th>
+                  <th>Valid Until</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E5E5E5] dark:divide-[#2D2D2D]">
+              <tbody>
                 {paginated.map(quote => {
                   const client = clients.find(c => c.id === quote.client_id)
                   const cfg = QUOTE_STATUS_CONFIG[quote.status] || QUOTE_STATUS_CONFIG.draft
@@ -525,26 +526,26 @@ export default function QuotationsPage() {
                   return (
                     <tr
                       key={quote.id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-[#252525]/50 transition-colors cursor-pointer"
+                      className="cursor-pointer"
                       onClick={() => setViewQuote(quote)}
                     >
                       {/* Quote Number */}
-                      <td className="py-3 px-4">
-                        <div className="font-mono font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <td>
+                        <div className="font-mono font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                           {quote.quote_number}
                           {quote.version && quote.version > 1 && (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 font-mono">
                               v{quote.version}
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                           Issued {formatDate(quote.created_at)}
                         </div>
                       </td>
 
                       {/* Project & Client */}
-                      <td className="py-3 px-4">
+                      <td>
                         <div className="font-semibold text-slate-900 dark:text-slate-100">{quote.title}</div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                           {client?.business_name || client?.name || 'Client'} ({client?.client_code || 'CS-CLIENT'})
@@ -552,11 +553,11 @@ export default function QuotationsPage() {
                       </td>
 
                       {/* Status Selector */}
-                      <td className="py-3 px-4" onClick={e => e.stopPropagation()}>
+                      <td onClick={e => e.stopPropagation()}>
                         <select
                           value={quote.status === 'accepted' ? 'approved' : quote.status}
                           onChange={e => handleStatusChange(quote.id, e.target.value as QuotationStatus)}
-                          className={`text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none ${cfg.badge}`}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-md border cursor-pointer focus:outline-none ${cfg.badge}`}
                         >
                           <option value="draft">Draft</option>
                           <option value="sent">Sent</option>
@@ -570,34 +571,34 @@ export default function QuotationsPage() {
                       </td>
 
                       {/* Total */}
-                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">
+                      <td className="font-mono font-semibold text-slate-900 dark:text-slate-100">
                         {formatCurrency(quote.total)}
                       </td>
 
                       {/* Advance Breakdown */}
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-slate-700 dark:text-slate-300">
+                      <td>
+                        <div className="font-mono font-medium text-slate-700 dark:text-slate-300">
                           {advancePct}% ({formatCurrency(advanceAmt)})
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                           Bal: {formatCurrency(quote.total - advanceAmt)}
                         </div>
                       </td>
 
                       {/* Valid Until */}
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
+                      <td className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">
                         {quote.valid_until ? formatDate(quote.valid_until) : '30 Days'}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
+                      <td className="text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           {/* Approve Action */}
                           {!isApproved && (
                             <button
                               onClick={() => setApprovalModalQuote(quote)}
                               title="Record Client Approval"
-                              className="px-2 py-1 rounded bg-green-500/10 text-green-500 hover:bg-green-500/20 text-[11px] font-semibold flex items-center gap-1"
+                              className="px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-[11px] font-medium flex items-center gap-1 border border-emerald-500/20"
                             >
                               <ShieldCheck className="w-3 h-3" /> Approve
                             </button>
@@ -608,7 +609,7 @@ export default function QuotationsPage() {
                             <button
                               onClick={() => handleConvertToProject(quote)}
                               title="Convert to Project"
-                              className="px-2 py-1 rounded bg-[#0D99FF]/10 text-[#0D99FF] hover:bg-[#0D99FF]/20 text-[11px] font-semibold flex items-center gap-1"
+                              className="px-2 py-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 text-[11px] font-medium flex items-center gap-1 border border-blue-500/20"
                             >
                               <ArrowRight className="w-3 h-3" /> Project
                             </button>
@@ -618,7 +619,7 @@ export default function QuotationsPage() {
                           <button
                             onClick={() => handlePrint(quote)}
                             title="Print / Save PDF"
-                            className="p-1 text-slate-400 hover:text-blue-400 transition-colors"
+                            className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
                           >
                             <Printer className="w-3.5 h-3.5" />
                           </button>

@@ -386,115 +386,116 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in p-6 bg-slate-950 text-slate-100 min-h-screen">
+    <div className="space-y-6 animate-fade-in pb-12">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Finance & Payment Management</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            Strict evidence-based payment verification, advance tracking, and verified receipts (₹)
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Finance &amp; Payment Settlements</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+            Strict evidence-based payment verification, advance tracking, and verified receipts (₹).
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={loadData}
-            className="p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-colors border border-slate-800"
+            className="btn-secondary"
             title="Refresh database"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
           </button>
           <button
             onClick={() => setShowRefundModal(true)}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-rose-400 border border-rose-500/30 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all"
+            className="btn-secondary text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50"
           >
-            <RotateCcw className="w-4 h-4" />
-            Issue Refund
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Issue Refund</span>
           </button>
           <button
             onClick={() => setShowRecordModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all"
+            className="btn-primary"
           >
-            <Plus className="w-4 h-4" />
-            Record Payment
+            <Plus className="w-3.5 h-3.5" />
+            <span>Record Payment</span>
           </button>
         </div>
       </div>
 
       {/* Security Mandate Alert Banner */}
-      <div className="bg-blue-950/40 border border-blue-800/60 rounded-2xl p-4 flex items-start gap-3.5">
-        <ShieldCheck className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
-        <div className="text-xs text-slate-300 leading-relaxed">
-          <strong className="text-blue-300">CapeSecure Financial Security Mandate:</strong> In accordance with audit standards, customer payments are never recognized or marked as successful merely upon submission of a screenshot. Every transaction requires verification against confirmed bank statement settlements, NEFT/IMPS/UPI UTR reconciliation, or signed gateway webhook responses before official receipt issuance.
+      <div className="bg-slate-50 dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 rounded-xl p-3.5 flex items-start gap-3 shadow-xs">
+        <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+        <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+          <strong className="text-slate-900 dark:text-slate-100 font-semibold">CapeSecure Financial Security Mandate:</strong> In accordance with audit standards, customer payments are never recognized merely upon screenshot submission. Every transaction requires verification against confirmed bank statement settlements, NEFT/IMPS/UPI UTR reconciliation, or signed gateway webhook responses before official receipt issuance.
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-xs uppercase font-medium">Verified Collections</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 p-4 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+            <span className="text-[10px] uppercase font-semibold tracking-wider">Verified Collections</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
           </div>
-          <p className="text-xl font-bold text-emerald-400">{formatCurrency(stats.totalCollected)}</p>
-          <span className="text-xs text-slate-500 mt-1 block">{stats.verifiedCount} verified transactions</span>
+          <p className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{formatCurrency(stats.totalCollected)}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block font-mono">{stats.verifiedCount} verified transactions</span>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-xs uppercase font-medium">Pending Verification</span>
-            <Clock className="w-4 h-4 text-amber-400" />
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 p-4 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+            <span className="text-[10px] uppercase font-semibold tracking-wider">Pending Verification</span>
+            <Clock className="w-4 h-4 text-amber-500" />
           </div>
-          <p className="text-xl font-bold text-amber-400">{formatCurrency(stats.totalPending)}</p>
-          <span className="text-xs text-slate-500 mt-1 block">{stats.pendingCount} awaiting bank reconciliation</span>
+          <p className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400">{formatCurrency(stats.totalPending)}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block font-mono">{stats.pendingCount} awaiting bank reconciliation</span>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-xs uppercase font-medium">Advance Payments</span>
-            <ArrowDownRight className="w-4 h-4 text-blue-400" />
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 p-4 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+            <span className="text-[10px] uppercase font-semibold tracking-wider">Advance Settlements</span>
+            <ArrowDownRight className="w-4 h-4 text-blue-500" />
           </div>
-          <p className="text-xl font-bold text-blue-400">{formatCurrency(stats.advancePayments)}</p>
-          <span className="text-xs text-slate-500 mt-1 block">50% upfront project milestones</span>
+          <p className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400">{formatCurrency(stats.advancePayments)}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block">50% upfront project milestones</span>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-xs uppercase font-medium">Refunds Documented</span>
-            <RotateCcw className="w-4 h-4 text-rose-400" />
+        <div className="bg-white dark:bg-[#0e1526] border border-slate-200/90 dark:border-slate-800/90 p-4 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+            <span className="text-[10px] uppercase font-semibold tracking-wider">Refunds Documented</span>
+            <RotateCcw className="w-4 h-4 text-rose-500" />
           </div>
-          <p className="text-xl font-bold text-rose-400">{formatCurrency(stats.totalRefunded)}</p>
-          <span className="text-xs text-slate-500 mt-1 block">Adjustments & refunds ledger</span>
+          <p className="text-xl font-bold font-mono text-rose-600 dark:text-rose-400">{formatCurrency(stats.totalRefunded)}</p>
+          <span className="text-[11px] text-slate-400 mt-1 block">Adjustments &amp; refunds ledger</span>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col lg:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
             type="text"
             placeholder="Search by UTR, Receipt #, Client, Project..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-1.5 focus:ring-blue-600 focus:border-blue-600 shadow-xs"
           />
         </div>
         <div className="flex flex-wrap gap-2">
           <select
             value={verificationFilter}
             onChange={e => setVerificationFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 text-xs focus:outline-none shadow-xs"
           >
             <option value="all">All Verification Statuses</option>
-            <option value="verified">Verified & Settled</option>
-            <option value="pending_verification">Pending Verification</option>
+            <option value="verified">Verified &amp; Settled</option>
+            <option value="pending_verification">Pending Bank Verification</option>
             <option value="rejected">Rejected / Invalid</option>
             <option value="disputed">Disputed</option>
           </select>
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 text-xs focus:outline-none shadow-xs"
           >
             <option value="all">All Payment Types</option>
             <option value="advance">Advance (50%)</option>
@@ -507,7 +508,7 @@ export default function PaymentsPage() {
           <select
             value={methodFilter}
             onChange={e => setMethodFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 bg-white dark:bg-[#0e1526] border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 text-xs focus:outline-none shadow-xs"
           >
             <option value="all">All Payment Methods</option>
             <option value="upi">UPI (GPay/PhonePe/Paytm)</option>
@@ -520,20 +521,20 @@ export default function PaymentsPage() {
       </div>
 
       {/* Payments Ledger Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="table-wrapper">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900/90 border-b border-slate-800 text-xs uppercase font-medium text-slate-400">
+          <table className="table">
+            <thead>
               <tr>
-                <th className="text-left px-4 py-3">Receipt / Ref</th>
-                <th className="text-left px-4 py-3">Client / Business</th>
-                <th className="text-left px-4 py-3">Project / Invoice</th>
-                <th className="text-right px-4 py-3">Amount (₹)</th>
-                <th className="text-left px-4 py-3">Type</th>
-                <th className="text-left px-4 py-3">Method</th>
-                <th className="text-left px-4 py-3">Verification Status</th>
-                <th className="text-left px-4 py-3">Date</th>
-                <th className="text-right px-4 py-3">Actions</th>
+                <th>Receipt / Ref</th>
+                <th>Client / Business</th>
+                <th>Project / Invoice</th>
+                <th className="text-right">Amount (₹)</th>
+                <th>Type</th>
+                <th>Method</th>
+                <th>Verification Status</th>
+                <th>Date</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
