@@ -446,28 +446,80 @@ export interface Invoice {
 export type ProjectStatus = 'planning' | 'design' | 'development' | 'review' | 'testing' | 'deployment' | 'live' | 'maintenance' | 'paused' | 'cancelled'
 export type ProjectPriority = 'low' | 'medium' | 'high' | 'urgent'
 
+export type ProjectPipelineStage =
+  | 'project_created'
+  | 'advance_payment_verified'
+  | 'requirements_finalized'
+  | 'ui_ux_design'
+  | 'design_review'
+  | 'design_approved'
+  | 'frontend_development'
+  | 'backend_development'
+  | 'database_integration'
+  | 'internal_testing'
+  | 'client_review'
+  | 'revisions'
+  | 'final_qa'
+  | 'final_payment'
+  | 'deployment'
+  | 'handover'
+  | 'completed'
+
+export interface ProjectActivityLogItem {
+  id: string
+  action: string
+  performed_by: string
+  timestamp: string
+  details?: string
+  previous_stage?: string
+  new_stage?: string
+}
+
 export interface Project {
   id: string
+  project_number?: string
   client_id: string
+  quotation_id?: string | null
   agreement_id: string | null
   name: string
   description: string | null
+  budget?: number
   status: ProjectStatus
+  pipeline_stage?: ProjectPipelineStage
   priority: ProjectPriority
   start_date: string | null
   deadline: string | null
+  expected_delivery_date?: string | null
+  project_manager?: string | null
+  development_team?: string[]
   completed_at: string | null
   website_url: string | null
   staging_url: string | null
   repository_url: string | null
   tech_stack: string[]
   progress: number
+  activity_log?: ProjectActivityLogItem[]
   created_at: string
   updated_at: string
 }
 
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'blocked'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
+
+export interface TaskComment {
+  id: string
+  user: string
+  text: string
+  created_at: string
+}
+
+export interface TaskAttachment {
+  id: string
+  name: string
+  url: string
+  size?: number
+  uploaded_at: string
+}
 
 export interface Task {
   id: string
@@ -479,7 +531,62 @@ export interface Task {
   assigned_to: string | null
   due_date: string | null
   completed_at: string | null
+  completed_by?: string | null
+  progress?: number
+  comments?: TaskComment[]
+  attachments?: TaskAttachment[]
   tags: string[]
+  created_at: string
+  updated_at: string
+}
+
+export type DesignStage = 'Wireframe' | 'Mockup' | 'Prototype' | 'Final'
+export type DesignApprovalStatus = 'pending' | 'approved' | 'revision_requested'
+
+export interface DesignApprovalHistoryItem {
+  action: string
+  by: string
+  timestamp: string
+  feedback?: string
+}
+
+export interface DesignApproval {
+  id: string
+  project_id: string
+  client_id?: string | null
+  title: string
+  stage: DesignStage
+  preview_url: string
+  figma_url?: string | null
+  description?: string | null
+  status: DesignApprovalStatus
+  client_feedback?: string | null
+  approved_by?: string | null
+  approved_at?: string | null
+  revision_requested_at?: string | null
+  version: number
+  approval_history?: DesignApprovalHistoryItem[]
+  created_at: string
+  updated_at: string
+}
+
+export type RevisionStatus = 'pending' | 'in_progress' | 'review' | 'resolved'
+export type RevisionPriority = 'low' | 'medium' | 'high' | 'urgent'
+
+export interface ProjectRevision {
+  id: string
+  project_id: string
+  design_approval_id?: string | null
+  revision_number: number
+  requested_changes: string
+  assigned_person?: string | null
+  requested_by?: string | null
+  status: RevisionStatus
+  priority: RevisionPriority
+  request_date: string
+  completion_deadline?: string | null
+  resolved_date?: string | null
+  resolution_notes?: string | null
   created_at: string
   updated_at: string
 }

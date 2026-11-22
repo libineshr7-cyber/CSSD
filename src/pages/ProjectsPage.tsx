@@ -2,497 +2,694 @@ import { useState, useMemo, useEffect } from 'react'
 import {
   Plus, Search, Edit2, X, LayoutGrid, List,
   Calendar, ExternalLink, GitBranch, ChevronDown,
-  Layers, Code2, Rocket, Paintbrush, RefreshCw
+  Layers, Code2, Rocket, Paintbrush, RefreshCw,
+  CheckCircle2, Clock, AlertTriangle, ShieldCheck,
+  User, Users, DollarSign, FileText, ArrowRight,
+  TrendingUp, Award, Check, Sparkles
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { formatDate } from '../lib/utils'
+import { formatDate, formatCurrency } from '../lib/utils'
 import { supabase } from '../lib/supabase'
-import type { Project, ProjectStatus, ProjectPriority, Client } from '../types/database'
+import { useAuth } from '../contexts/AuthContext'
+import type {
+  Project,
+  ProjectStatus,
+  ProjectPriority,
+  ProjectPipelineStage,
+  ProjectActivityLogItem,
+  Client,
+  Quotation,
+  Agreement
+} from '../types/database'
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// ─── 17-Stage Granular Pipeline Definition ────────────────────────────────────
 
-const PRIORITY_CONFIG: Record<ProjectPriority, { badge: string; label: string; border: string }> = {
-  urgent: { badge: 'bg-red-500/10 text-red-400 border-red-500/20',       label: 'Urgent',  border: 'border-l-red-500' },
-  high:   { badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20', label: 'High',  border: 'border-l-orange-500' },
-  medium: { badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',     label: 'Medium', border: 'border-l-blue-500' },
-  low:    { badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',   label: 'Low',   border: 'border-l-slate-500' },
+export interface PipelineStageConfig {
+  key: ProjectPipelineStage
+  step: number
+  label: string
+  phase: string
+  progress: number
+  description: string
+  statusGroup: ProjectStatus
 }
 
-const STATUS_CONFIG: Record<ProjectStatus, { badge: string; label: string; dot: string }> = {
-  planning:    { badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',     dot: 'bg-slate-500',   label: 'Planning' },
-  design:      { badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20',  dot: 'bg-purple-500',  label: 'Design' },
-  development: { badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',        dot: 'bg-blue-500',    label: 'Development' },
-  review:      { badge: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',  dot: 'bg-yellow-500',  label: 'Review' },
-  testing:     { badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20',  dot: 'bg-orange-500',  label: 'Testing' },
-  deployment:  { badge: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',        dot: 'bg-cyan-500',    label: 'Deployment' },
-  live:        { badge: 'bg-green-500/10 text-green-400 border-green-500/20',     dot: 'bg-green-500',   label: 'Live' },
-  maintenance: { badge: 'bg-teal-500/10 text-teal-400 border-teal-500/20',        dot: 'bg-teal-500',    label: 'Maintenance' },
-  paused:      { badge: 'bg-slate-600/10 text-slate-400 border-slate-600/20',     dot: 'bg-slate-600',   label: 'Paused' },
-  cancelled:   { badge: 'bg-red-500/10 text-red-400 border-red-500/20',           dot: 'bg-red-500',     label: 'Cancelled' },
-}
-
-const KANBAN_COLUMNS: { status: ProjectStatus; label: string; icon: React.ReactNode }[] = [
-  { status: 'planning',    label: 'Planning',    icon: <Layers className="w-3.5 h-3.5" /> },
-  { status: 'design',      label: 'Design',      icon: <Paintbrush className="w-3.5 h-3.5" /> },
-  { status: 'development', label: 'Development', icon: <Code2 className="w-3.5 h-3.5" /> },
-  { status: 'review',      label: 'Review',      icon: <Search className="w-3.5 h-3.5" /> },
-  { status: 'testing',     label: 'Testing',     icon: <Layers className="w-3.5 h-3.5" /> },
-  { status: 'live',        label: 'Live',        icon: <Rocket className="w-3.5 h-3.5" /> },
+export const PIPELINE_STAGES: PipelineStageConfig[] = [
+  { key: 'project_created',          step: 1,  label: 'Project Created',          phase: 'Inception',    progress: 6,   statusGroup: 'planning',    description: 'Project initialized and assigned unique project number' },
+  { key: 'advance_payment_verified', step: 2,  label: 'Advance Payment Verified', phase: 'Inception',    progress: 12,  statusGroup: 'planning',    description: '50% initial commitment verified against bank settlement' },
+  { key: 'requirements_finalized',   step: 3,  label: 'Requirements Finalized',   phase: 'Inception',    progress: 18,  statusGroup: 'planning',    description: 'Technical PRD and functional scope signed off by client' },
+  { key: 'ui_ux_design',             step: 4,  label: 'UI/UX Design',             phase: 'Design',       progress: 24,  statusGroup: 'design',      description: 'Wireframing, typography, and interactive Figma mockups' },
+  { key: 'design_review',            step: 5,  label: 'Design Review',            phase: 'Design',       progress: 30,  statusGroup: 'design',      description: 'Internal creative review and design system alignment' },
+  { key: 'design_approved',          step: 6,  label: 'Design Approved',          phase: 'Design',       progress: 36,  statusGroup: 'design',      description: 'Formal sign-off and approval obtained from client' },
+  { key: 'frontend_development',     step: 7,  label: 'Frontend Development',     phase: 'Engineering',  progress: 42,  statusGroup: 'development', description: 'React, Tailwind, responsive UI layout implementation' },
+  { key: 'backend_development',      step: 8,  label: 'Backend Development',      phase: 'Engineering',  progress: 48,  statusGroup: 'development', description: 'Business logic, authentication, and secure API endpoints' },
+  { key: 'database_integration',     step: 9,  label: 'Database Integration',     phase: 'Engineering',  progress: 54,  statusGroup: 'development', description: 'PostgreSQL schema, RLS policies, indexes, and migrations' },
+  { key: 'internal_testing',         step: 10, label: 'Internal Testing',         phase: 'Quality',      progress: 60,  statusGroup: 'testing',     description: 'Automated test suite, unit tests, and cross-browser checks' },
+  { key: 'client_review',            step: 11, label: 'Client Review',            phase: 'Quality',      progress: 66,  statusGroup: 'review',      description: 'Staging environment walkthrough with client stakeholders' },
+  { key: 'revisions',                step: 12, label: 'Revisions',                phase: 'Quality',      progress: 72,  statusGroup: 'development', description: 'Incorporating requested revisions and refinement feedback' },
+  { key: 'final_qa',                 step: 13, label: 'Final QA & Audit',         phase: 'Quality',      progress: 78,  statusGroup: 'testing',     description: 'OWASP Top 10 security audit, performance, and SEO checks' },
+  { key: 'final_payment',            step: 14, label: 'Final Payment Verified',   phase: 'Delivery',     progress: 85,  statusGroup: 'review',      description: 'Final 50% milestone settlement verified and receipt generated' },
+  { key: 'deployment',               step: 15, label: 'Production Deployment',   phase: 'Delivery',     progress: 92,  statusGroup: 'deployment',  description: 'SSL certification, DNS configuration, and cloud release' },
+  { key: 'handover',                 step: 16, label: 'Client Handover',          phase: 'Delivery',     progress: 96,  statusGroup: 'live',        description: 'Credentials transfer, admin training, and documentation delivery' },
+  { key: 'completed',                step: 17, label: 'Project Completed',        phase: 'Delivery',     progress: 100, statusGroup: 'live',        description: 'Warranty period initiated and project transitioned to maintenance' },
 ]
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+export const STAGE_MAP = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s]))
 
-function StatusBadge({ status }: { status: ProjectStatus }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.planning
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.badge}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-      {cfg.label}
-    </span>
-  )
+const PRIORITY_CONFIG: Record<ProjectPriority, { badge: string; label: string; border: string }> = {
+  urgent: { badge: 'bg-rose-500/10 text-rose-400 border-rose-500/20',     label: 'Urgent',  border: 'border-l-rose-500' },
+  high:   { badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',   label: 'High',    border: 'border-l-amber-500' },
+  medium: { badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',     label: 'Medium',  border: 'border-l-blue-500' },
+  low:    { badge: 'bg-slate-500/10 text-slate-400 border-slate-500/20',   label: 'Low',     border: 'border-l-slate-500' },
 }
 
-function PriorityBadge({ priority }: { priority: ProjectPriority }) {
-  const cfg = PRIORITY_CONFIG[priority] ?? PRIORITY_CONFIG.medium
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.badge}`}>
-      {cfg.label}
-    </span>
-  )
-}
-
-function ProgressBar({ value }: { value: number }) {
-  const color = value >= 80 ? 'bg-green-500' : value >= 50 ? 'bg-blue-500' : value >= 25 ? 'bg-yellow-500' : 'bg-slate-600'
-  return (
-    <div className="w-full bg-slate-800 rounded-full h-1.5">
-      <div className={`h-1.5 rounded-full transition-all ${color}`} style={{ width: `${Math.min(value, 100)}%` }} />
-    </div>
-  )
-}
-
-// ─── Form / Modal ─────────────────────────────────────────────────────────────
-
-type FormData = {
-  name: string; client_id: string; description: string
-  status: ProjectStatus; priority: ProjectPriority
-  start_date: string; deadline: string; progress: string
-  tech_stack: string; staging_url: string; repository_url: string
-}
-
-const EMPTY_FORM: FormData = {
-  name: '', client_id: '', description: '', status: 'planning', priority: 'medium',
-  start_date: '', deadline: '', progress: '0', tech_stack: '', staging_url: '', repository_url: '',
-}
-
-const inputCls = 'w-full px-3 py-2 bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D99FF] focus:border-transparent'
-
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-slate-400 mb-1.5">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-function ProjectModal({
-  open, onClose, onSave, initial, title, clients = [],
-}: {
-  open: boolean; onClose: () => void; onSave: (d: FormData) => void; initial: FormData; title: string; clients?: Client[]
-}) {
-  const [form, setForm] = useState<FormData>(initial)
-  if (!open) return null
-  const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }))
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.name.trim()) { toast.error('Project name is required'); return }
-    onSave(form)
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-6 border-b border-[#E5E5E5] dark:border-[#383838]">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"><X className="w-5 h-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <FormField label="Project Name *">
-            <input className={inputCls} value={form.name} onChange={set('name')} placeholder="My Awesome Project" required />
-          </FormField>
-          <FormField label="Client">
-            <select className={`${inputCls} cursor-pointer`} value={form.client_id} onChange={set('client_id')}>
-              <option value="">Select client...</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name} – {c.business_name || c.company}</option>)}
-            </select>
-          </FormField>
-          <FormField label="Description">
-            <textarea className={`${inputCls} resize-none`} rows={3} value={form.description} onChange={set('description')} placeholder="Project description..." />
-          </FormField>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Status">
-              <select className={`${inputCls} cursor-pointer`} value={form.status} onChange={set('status')}>
-                {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Priority">
-              <select className={`${inputCls} cursor-pointer`} value={form.priority} onChange={set('priority')}>
-                {Object.entries(PRIORITY_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-              </select>
-            </FormField>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Start Date">
-              <input type="date" className={inputCls} value={form.start_date} onChange={set('start_date')} />
-            </FormField>
-            <FormField label="Deadline">
-              <input type="date" className={inputCls} value={form.deadline} onChange={set('deadline')} />
-            </FormField>
-          </div>
-          <FormField label="Progress (%)">
-            <input type="range" min="0" max="100" value={form.progress} onChange={set('progress')} className="w-full" />
-            <span className="text-xs text-slate-400">{form.progress}%</span>
-          </FormField>
-          <FormField label="Tech Stack (comma-separated)">
-            <input className={inputCls} value={form.tech_stack} onChange={set('tech_stack')} placeholder="React, Node.js, PostgreSQL" />
-          </FormField>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-slate-700 text-slate-400 hover:text-slate-200 rounded-lg text-sm transition-colors">Cancel</button>
-            <button type="submit" className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors">Save Project</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// ─── Kanban Card ──────────────────────────────────────────────────────────────
-
-function KanbanCard({ project, clientName, onEdit }: { project: Project; clientName: string; onEdit: (p: Project) => void }) {
-  const priCfg = PRIORITY_CONFIG[project.priority]
-  return (
-    <div className={`bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] border-l-4 ${priCfg.border} rounded-xl p-4 space-y-3 hover:border-slate-300 dark:hover:border-slate-600 shadow-xs hover:shadow-md transition-all`}>
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 leading-tight">{project.name}</p>
-        <button onClick={() => onEdit(project)} className="text-slate-400 hover:text-[#0D99FF] transition-colors shrink-0">
-          <Edit2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-      <p className="text-xs text-slate-500">{clientName}</p>
-      <div className="flex items-center gap-2">
-        <PriorityBadge priority={project.priority} />
-      </div>
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-slate-500">Progress</span>
-          <span className="text-xs font-medium text-slate-400">{project.progress}%</span>
-        </div>
-        <ProgressBar value={project.progress} />
-      </div>
-      {project.deadline && (
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <Calendar className="w-3 h-3" />
-          {formatDate(project.deadline)}
-        </div>
-      )}
-      {project.tech_stack.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {project.tech_stack.slice(0, 3).map(t => (
-            <span key={t} className="px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded text-xs">{t}</span>
-          ))}
-          {project.tech_stack.length > 3 && (
-            <span className="px-1.5 py-0.5 bg-slate-800 text-slate-600 rounded text-xs">+{project.tech_stack.length - 3}</span>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
+const KANBAN_PHASES = [
+  { id: 'Inception',   title: '1. Inception & Scope',       icon: Layers,     color: 'text-blue-400',   bg: 'bg-blue-500/10' },
+  { id: 'Design',      title: '2. UI/UX Design & Approval', icon: Paintbrush, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+  { id: 'Engineering', title: '3. Core Development',        icon: Code2,      color: 'text-cyan-400',   bg: 'bg-cyan-500/10' },
+  { id: 'Quality',     title: '4. Testing & Verification',  icon: ShieldCheck,color: 'text-amber-400',  bg: 'bg-amber-500/10' },
+  { id: 'Delivery',    title: '5. Release & Handover',      icon: Rocket,     color: 'text-emerald-400',bg: 'bg-emerald-500/10' },
+]
 
 export default function ProjectsPage() {
+  const { user } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [clients, setClients] = useState<Client[]>([])
-  const [view, setView] = useState<'kanban' | 'table'>('kanban')
-  const [search, setSearch] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editProject, setEditProject] = useState<Project | null>(null)
-  const [formInitial, setFormInitial] = useState<FormData>(EMPTY_FORM)
+  const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [agreements, setAgreements] = useState<Agreement[]>([])
   const [loading, setLoading] = useState(false)
 
+  const [view, setView] = useState<'kanban' | 'table'>('kanban')
+  const [search, setSearch] = useState('')
+  const [phaseFilter, setPhaseFilter] = useState('all')
+  const [clientFilter, setClientFilter] = useState('all')
+
+  // Modals
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+
+  // Form State
+  const [clientId, setClientId] = useState('')
+  const [quotationId, setQuotationId] = useState('')
+  const [agreementId, setAgreementId] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [budget, setBudget] = useState('')
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
+  const [deadline, setDeadline] = useState('')
+  const [projectManager, setProjectManager] = useState('CapeSecure Lead Architect')
+  const [priority, setPriority] = useState<ProjectPriority>('medium')
+  const [techStackInput, setTechStackInput] = useState('React, TypeScript, Tailwind, Supabase, Node.js')
+  const [teamMembersInput, setTeamMembersInput] = useState('Lead Architect, Full-Stack Dev, UI Designer, QA Specialist')
+
+  // Load live data from Supabase
   const loadData = async () => {
     setLoading(true)
     try {
-      const { data: pData } = await (supabase as any)
-        .from('projects')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (pData) setProjects(pData)
+      const [
+        { data: pData },
+        { data: cData },
+        { data: qData },
+        { data: aData },
+      ] = await Promise.all([
+        (supabase as any).from('projects').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('clients').select('*').order('name', { ascending: true }),
+        (supabase as any).from('quotations').select('*').order('created_at', { ascending: false }),
+        (supabase as any).from('agreements').select('*').order('created_at', { ascending: false }),
+      ])
 
-      const { data: cData } = await (supabase as any)
-        .from('clients')
-        .select('*')
-        .order('name', { ascending: true })
-      if (cData) setClients(cData)
-    } catch (_) {}
-    setLoading(false)
+      if (pData) setProjects(pData as Project[])
+      if (cData) setClients(cData as Client[])
+      if (qData) setQuotations(qData as Quotation[])
+      if (aData) setAgreements(aData as Agreement[])
+    } catch (err) {
+      console.error('Error fetching projects data:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
     loadData()
+
+    const channel = supabase
+      .channel('capesecure-projects-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+        loadData()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const clientMap = useMemo(() => Object.fromEntries(clients.map(c => [c.id, c])), [clients])
+  const quotationMap = useMemo(() => Object.fromEntries(quotations.map(q => [q.id, q])), [quotations])
+  const agreementMap = useMemo(() => Object.fromEntries(agreements.map(a => [a.id, a])), [agreements])
 
-  const stats = useMemo(() => ({
-    active: projects.filter(p => p.status === 'development').length,
-    design: projects.filter(p => p.status === 'design').length,
-    dev:    projects.filter(p => p.status === 'development').length,
-    live:   projects.filter(p => p.status === 'live').length,
-  }), [projects])
-
-  const filtered = useMemo(() => projects.filter(p => {
-    const q = search.toLowerCase()
-    return !q || p.name.toLowerCase().includes(q) || (clientMap[p.client_id]?.name ?? '').toLowerCase().includes(q)
-  }), [projects, search, clientMap])
-
-  const openAdd = () => { setEditProject(null); setFormInitial(EMPTY_FORM); setModalOpen(true) }
-  const openEdit = (project: Project) => {
-    setEditProject(project)
-    setFormInitial({
-      name: project.name, client_id: project.client_id,
-      description: project.description ?? '', status: project.status, priority: project.priority,
-      start_date: project.start_date?.slice(0, 10) ?? '',
-      deadline: project.deadline?.slice(0, 10) ?? '',
-      progress: project.progress.toString(),
-      tech_stack: project.tech_stack.join(', '),
-      staging_url: project.staging_url ?? '', repository_url: project.repository_url ?? '',
-    })
-    setModalOpen(true)
-  }
-
-  const handleSave = async (data: FormData) => {
-    const techStack = data.tech_stack ? data.tech_stack.split(',').map(s => s.trim()).filter(Boolean) : []
-    if (editProject) {
-      const updated: Partial<Project> = {
-        name: data.name,
-        client_id: data.client_id,
-        description: data.description || null,
-        status: data.status,
-        priority: data.priority,
-        progress: Number(data.progress),
-        tech_stack: techStack,
-        start_date: data.start_date ? new Date(data.start_date).toISOString() : null,
-        deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
-        staging_url: data.staging_url || null,
-        repository_url: data.repository_url || null,
-        updated_at: new Date().toISOString()
-      }
-
-      try {
-        await (supabase as any).from('projects').update(updated).eq('id', editProject.id)
-      } catch (_) {}
-
-      setProjects(ps => ps.map(p => p.id === editProject.id ? { ...p, ...updated } : p))
-      toast.success('Project updated')
-    } else {
-      const newProj: Project = {
-        id: `proj-${Date.now()}`,
-        client_id: data.client_id,
-        agreement_id: null,
-        name: data.name,
-        description: data.description || null,
-        status: data.status,
-        priority: data.priority,
-        start_date: data.start_date ? new Date(data.start_date).toISOString() : null,
-        deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
-        completed_at: null,
-        website_url: null,
-        staging_url: data.staging_url || null,
-        repository_url: data.repository_url || null,
-        tech_stack: techStack,
-        progress: Number(data.progress),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      try {
-        await (supabase as any).from('projects').insert([newProj])
-      } catch (_) {}
-
-      setProjects(ps => [newProj, ...ps])
-      toast.success('Project added')
+  // Auto-fill budget and client when quotation is chosen
+  const handleQuotationSelect = (qId: string) => {
+    setQuotationId(qId)
+    if (!qId) return
+    const q = quotations.find(item => item.id === qId)
+    if (q) {
+      if (q.client_id) setClientId(q.client_id)
+      if (q.total) setBudget(String(q.total))
+      if (!name) setName(q.title)
     }
-    setModalOpen(false)
   }
 
-  const STAT_CARDS = [
-    { label: 'Development', value: stats.active, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'In Design',   value: stats.design, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-    { label: 'In Dev',      value: stats.dev,    color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-    { label: 'Live',        value: stats.live,   color: 'text-green-400', bg: 'bg-green-500/10' },
-  ]
+  // Generate sequential project ID: CS-PRJ-2026-001
+  const generateNextProjectNumber = () => {
+    const year = new Date().getFullYear()
+    const nextSeq = String(projects.length + 1).padStart(3, '0')
+    return `CS-PRJ-${year}-${nextSeq}`
+  }
+
+  // Handle Create Project
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) {
+      toast.error('Project title is required')
+      return
+    }
+    if (!clientId) {
+      toast.error('Please select a client for this project')
+      return
+    }
+
+    const nextProjectNumber = generateNextProjectNumber()
+    const nowIso = new Date().toISOString()
+    const currentUserEmail = user?.email || 'Authorized Administrator'
+
+    const initialStageConfig = PIPELINE_STAGES[0] // 'project_created'
+    const techStack = techStackInput.split(',').map(s => s.trim()).filter(Boolean)
+    const teamMembers = teamMembersInput.split(',').map(s => s.trim()).filter(Boolean)
+
+    const initialActivity: ProjectActivityLogItem[] = [
+      {
+        id: `act-${Date.now()}`,
+        action: 'Project Initialized',
+        performed_by: currentUserEmail,
+        timestamp: nowIso,
+        details: `Created as ${nextProjectNumber} with budget ₹${Number(budget || 0).toLocaleString('en-IN')}`,
+        new_stage: initialStageConfig.key
+      }
+    ]
+
+    const newProject: Partial<Project> = {
+      project_number: nextProjectNumber,
+      client_id: clientId,
+      quotation_id: quotationId || null,
+      agreement_id: agreementId || null,
+      name: name.trim(),
+      description: description.trim() || null,
+      budget: Number(budget) || 0,
+      status: initialStageConfig.statusGroup,
+      pipeline_stage: initialStageConfig.key,
+      priority,
+      start_date: startDate ? new Date(startDate).toISOString() : null,
+      deadline: deadline ? new Date(deadline).toISOString() : null,
+      expected_delivery_date: deadline ? new Date(deadline).toISOString() : null,
+      project_manager: projectManager.trim() || 'CapeSecure Project Lead',
+      development_team: teamMembers,
+      tech_stack: techStack,
+      progress: initialStageConfig.progress,
+      activity_log: initialActivity,
+      completed_at: null,
+      created_at: nowIso,
+      updated_at: nowIso,
+    }
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from('projects')
+        .insert([newProject])
+        .select()
+        .single()
+
+      if (error) {
+        console.warn('Supabase insert project error, falling back locally:', error)
+        const localProj: Project = {
+          id: `proj-${Date.now()}`,
+          ...(newProject as any)
+        }
+        setProjects([localProj, ...projects])
+      } else if (data) {
+        setProjects([data as Project, ...projects])
+      }
+
+      toast.success(`Project ${nextProjectNumber} created successfully!`)
+      setShowCreateModal(false)
+      resetForm()
+    } catch (err: any) {
+      toast.error(`Error saving project: ${err.message}`)
+    }
+  }
+
+  // Handle Advance Stage
+  const handleAdvanceStage = async (project: Project) => {
+    const currentStageKey = project.pipeline_stage || 'project_created'
+    const currentIndex = PIPELINE_STAGES.findIndex(s => s.key === currentStageKey)
+    if (currentIndex >= PIPELINE_STAGES.length - 1) {
+      toast.success('Project is already in Completed stage!')
+      return
+    }
+
+    const nextStage = PIPELINE_STAGES[currentIndex + 1]
+    const nowIso = new Date().toISOString()
+    const currentUserEmail = user?.email || 'Authorized Administrator'
+
+    const newActivityItem: ProjectActivityLogItem = {
+      id: `act-${Date.now()}`,
+      action: `Stage Advanced: ${nextStage.label}`,
+      performed_by: currentUserEmail,
+      timestamp: nowIso,
+      previous_stage: currentStageKey,
+      new_stage: nextStage.key,
+      details: nextStage.description
+    }
+
+    const updatedActivity = [...(project.activity_log || []), newActivityItem]
+    const isCompleted = nextStage.key === 'completed'
+
+    const updates = {
+      pipeline_stage: nextStage.key,
+      progress: nextStage.progress,
+      status: nextStage.statusGroup,
+      completed_at: isCompleted ? nowIso : project.completed_at,
+      activity_log: updatedActivity,
+      updated_at: nowIso
+    }
+
+    try {
+      await (supabase as any).from('projects').update(updates).eq('id', project.id)
+      setProjects(prev => prev.map(p => p.id === project.id ? { ...p, ...updates } : p))
+      if (selectedProject?.id === project.id) {
+        setSelectedProject(prev => prev ? { ...prev, ...updates } : null)
+      }
+      toast.success(`Advanced to Stage ${nextStage.step}/17: ${nextStage.label}!`)
+    } catch (err: any) {
+      toast.error(`Failed to advance stage: ${err.message}`)
+    }
+  }
+
+  // Handle Set Specific Stage
+  const handleSetSpecificStage = async (project: Project, targetStageKey: ProjectPipelineStage) => {
+    const targetStage = STAGE_MAP[targetStageKey]
+    if (!targetStage) return
+
+    const nowIso = new Date().toISOString()
+    const currentUserEmail = user?.email || 'Authorized Administrator'
+
+    const newActivityItem: ProjectActivityLogItem = {
+      id: `act-${Date.now()}`,
+      action: `Stage Set: ${targetStage.label}`,
+      performed_by: currentUserEmail,
+      timestamp: nowIso,
+      previous_stage: project.pipeline_stage,
+      new_stage: targetStage.key,
+      details: `Manually transitioned to ${targetStage.label}`
+    }
+
+    const updatedActivity = [...(project.activity_log || []), newActivityItem]
+    const isCompleted = targetStage.key === 'completed'
+
+    const updates = {
+      pipeline_stage: targetStage.key,
+      progress: targetStage.progress,
+      status: targetStage.statusGroup,
+      completed_at: isCompleted ? nowIso : (project.completed_at && !isCompleted ? null : project.completed_at),
+      activity_log: updatedActivity,
+      updated_at: nowIso
+    }
+
+    try {
+      await (supabase as any).from('projects').update(updates).eq('id', project.id)
+      setProjects(prev => prev.map(p => p.id === project.id ? { ...p, ...updates } : p))
+      if (selectedProject?.id === project.id) {
+        setSelectedProject(prev => prev ? { ...prev, ...updates } : null)
+      }
+      toast.success(`Updated to Stage ${targetStage.step}/17: ${targetStage.label}!`)
+    } catch (err: any) {
+      toast.error(`Failed to update stage: ${err.message}`)
+    }
+  }
+
+  const resetForm = () => {
+    setClientId('')
+    setQuotationId('')
+    setAgreementId('')
+    setName('')
+    setDescription('')
+    setBudget('')
+    setDeadline('')
+    setPriority('medium')
+  }
+
+  // Filtered projects
+  const filtered = useMemo(() => {
+    return projects.filter(p => {
+      const client = clientMap[p.client_id]
+      const currentStageConfig = STAGE_MAP[p.pipeline_stage || 'project_created']
+      const currentPhase = currentStageConfig?.phase || 'Inception'
+
+      const matchSearch =
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        (p.project_number?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+        (client?.name?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+        (client?.business_name?.toLowerCase().includes(search.toLowerCase()) ?? false)
+
+      const matchPhase = phaseFilter === 'all' || currentPhase === phaseFilter
+      const matchClient = clientFilter === 'all' || p.client_id === clientFilter
+
+      return matchSearch && matchPhase && matchClient
+    })
+  }, [projects, search, phaseFilter, clientFilter, clientMap])
+
+  // Metrics
+  const metrics = useMemo(() => {
+    const totalProjects = projects.length
+    const activeProjects = projects.filter(p => p.status !== 'cancelled' && p.status !== 'live').length
+    const completedProjects = projects.filter(p => p.pipeline_stage === 'completed' || p.status === 'live').length
+    const totalCommittedBudget = projects.reduce((sum, p) => sum + (Number(p.budget) || 0), 0)
+    return { totalProjects, activeProjects, completedProjects, totalCommittedBudget }
+  }, [projects])
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 animate-fade-in p-6 bg-slate-950 text-slate-100 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Projects</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{projects.length} projects total</p>
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
+            <GitBranch className="w-7 h-7 text-blue-400" />
+            Project Management &amp; Delivery Pipeline
+          </h1>
+          <p className="text-slate-400 text-sm mt-0.5">
+            Connected to client, quotation, agreement and payment records across 17 granular lifecycle stages
+          </p>
         </div>
-        <button
-          onClick={openAdd}
-          className="inline-flex items-center gap-2 px-3.5 py-2 bg-[#0D99FF] hover:bg-[#007BE5] text-white rounded-lg text-xs font-semibold transition-all shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          Add Project
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STAT_CARDS.map(({ label, value, color, bg }) => (
-          <div key={label} className="bg-white dark:bg-[#2C2C2C] border border-[#E5E5E5] dark:border-[#383838] rounded-xl p-4 flex items-center gap-3 shadow-xs">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${bg}`}>
-              <Rocket className={`w-4 h-4 ${color}`} />
-            </div>
-            <div>
-              <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">{label}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-[#F5F5F5]">{value}</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadData}
+            className="p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-colors border border-slate-800"
+            title="Refresh from Supabase"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1">
+            <button
+              onClick={() => setView('kanban')}
+              className={`p-1.5 rounded-lg transition-colors ${view === 'kanban' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Kanban Board View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setView('table')}
+              className={`p-1.5 rounded-lg transition-colors ${view === 'table' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Detailed Table View"
+            >
+              <List className="w-4 h-4" />
+            </button>
           </div>
-        ))}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all"
+          >
+            <Plus className="w-4 h-4" /> Create Project
+          </button>
+        </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      {/* KPI Stats Bar */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-xs uppercase font-medium">Active Pipeline</span>
+            <Layers className="w-4 h-4 text-blue-400" />
+          </div>
+          <p className="text-2xl font-bold text-slate-100">{metrics.activeProjects}</p>
+          <span className="text-xs text-slate-500 mt-1 block">In engineering &amp; verification</span>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-xs uppercase font-medium">Completed Projects</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          </div>
+          <p className="text-2xl font-bold text-emerald-400">{metrics.completedProjects}</p>
+          <span className="text-xs text-slate-500 mt-1 block">Successfully handed over</span>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-xs uppercase font-medium">Contract Value Realized</span>
+            <DollarSign className="w-4 h-4 text-cyan-400" />
+          </div>
+          <p className="text-2xl font-bold text-cyan-400">{formatCurrency(metrics.totalCommittedBudget)}</p>
+          <span className="text-xs text-slate-500 mt-1 block">Cumulative project budgets (₹)</span>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-xs uppercase font-medium">Granular Stages</span>
+            <Sparkles className="w-4 h-4 text-purple-400" />
+          </div>
+          <p className="text-2xl font-bold text-purple-400">17 Stages</p>
+          <span className="text-xs text-slate-500 mt-1 block">Strict milestone gate control</span>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
-            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#252525] border border-[#E5E5E5] dark:border-[#383838] rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D99FF]"
-            placeholder="Search projects..."
+            type="text"
+            placeholder="Search project number, title, client, or team member..."
             value={search}
             onChange={e => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <div className="flex items-center bg-slate-100 dark:bg-[#1E1E1E] border border-[#E5E5E5] dark:border-[#383838] rounded-lg p-0.5 gap-1">
-          <button
-            onClick={() => setView('kanban')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${view === 'kanban' ? 'bg-[#0D99FF] text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            Kanban
-          </button>
-          <button
-            onClick={() => setView('table')}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${view === 'table' ? 'bg-[#0D99FF] text-white shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
-          >
-            <List className="w-3.5 h-3.5" />
-            Table
-          </button>
-        </div>
+        <select
+          value={phaseFilter}
+          onChange={e => setPhaseFilter(e.target.value)}
+          className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-sm sm:w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Lifecycle Phases</option>
+          <option value="Inception">1. Inception &amp; Scope</option>
+          <option value="Design">2. UI/UX Design</option>
+          <option value="Engineering">3. Core Development</option>
+          <option value="Quality">4. Testing &amp; Review</option>
+          <option value="Delivery">5. Release &amp; Handover</option>
+        </select>
+        <select
+          value={clientFilter}
+          onChange={e => setClientFilter(e.target.value)}
+          className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-sm sm:w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Clients</option>
+          {clients.map(c => (
+            <option key={c.id} value={c.id}>
+              {c.business_name || c.name}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Kanban View */}
+      {/* ─── KANBAN BOARD VIEW ──────────────────────────────────────────────── */}
       {view === 'kanban' && (
-        <div className="overflow-x-auto">
-          <div className="flex gap-4 min-w-max pb-2">
-            {KANBAN_COLUMNS.map(col => {
-              const colProjects = filtered.filter(p => p.status === col.status)
-              const cfg = STATUS_CONFIG[col.status]
-              return (
-                <div key={col.status} className="w-72 shrink-0">
-                  <div className="flex items-center gap-2 mb-3 px-1">
-                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-                    <span className="text-sm font-semibold text-slate-300">{col.label}</span>
-                    <span className="ml-auto text-xs text-slate-600 bg-slate-800 rounded-full px-2 py-0.5">{colProjects.length}</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
+          {KANBAN_PHASES.map(phase => {
+            const PhaseIcon = phase.icon
+            const phaseProjects = filtered.filter(p => {
+              const stageCfg = STAGE_MAP[p.pipeline_stage || 'project_created']
+              return (stageCfg?.phase || 'Inception') === phase.id
+            })
+
+            return (
+              <div key={phase.id} className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col min-w-[260px] space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-1.5 rounded-lg ${phase.bg} ${phase.color}`}>
+                      <PhaseIcon className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-200">{phase.title}</span>
                   </div>
-                  <div className="space-y-3 min-h-24">
-                    {colProjects.length === 0 ? (
-                      <div className="border-2 border-dashed border-slate-800 rounded-xl h-20 flex items-center justify-center">
-                        <span className="text-xs text-slate-700">No projects</span>
-                      </div>
-                    ) : (
-                      colProjects.map(p => (
-                        <KanbanCard
-                          key={p.id}
-                          project={p}
-                          clientName={clientMap[p.client_id]?.name ?? 'Unknown'}
-                          onEdit={openEdit}
-                        />
-                      ))
-                    )}
-                  </div>
+                  <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                    {phaseProjects.length}
+                  </span>
                 </div>
-              )
-            })}
-          </div>
+
+                <div className="space-y-3 flex-1">
+                  {phaseProjects.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-500 italic">
+                      No active projects in this phase.
+                    </div>
+                  ) : (
+                    phaseProjects.map(proj => {
+                      const client = clientMap[proj.client_id]
+                      const stageCfg = STAGE_MAP[proj.pipeline_stage || 'project_created'] || PIPELINE_STAGES[0]
+                      const priCfg = PRIORITY_CONFIG[proj.priority] || PRIORITY_CONFIG.medium
+
+                      return (
+                        <div
+                          key={proj.id}
+                          onClick={() => setSelectedProject(proj)}
+                          className={`bg-slate-900 border border-slate-800 hover:border-slate-700 p-4 rounded-xl cursor-pointer transition-all shadow-md space-y-3 border-l-4 ${priCfg.border}`}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="text-[11px] font-mono font-bold text-blue-400">
+                              {proj.project_number || 'CS-PRJ-2026-XXX'}
+                            </span>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${priCfg.badge}`}>
+                              {priCfg.label}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-100 leading-tight">
+                              {proj.name}
+                            </h4>
+                            <p className="text-xs text-slate-400 mt-0.5 truncate">
+                              {client?.business_name || client?.name || 'Direct Client'}
+                            </p>
+                          </div>
+
+                          {/* 17-Stage Step Indicator */}
+                          <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-blue-400 font-semibold truncate">
+                                Stage {stageCfg.step}/17: {stageCfg.label}
+                              </span>
+                              <span className="font-mono text-slate-400 text-[10px]">
+                                {stageCfg.progress}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                                style={{ width: `${stageCfg.progress}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 text-xs text-slate-400">
+                            <span className="font-semibold text-slate-200">
+                              {formatCurrency(proj.budget || 0)}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAdvanceStage(proj)
+                              }}
+                              className="px-2 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white rounded-lg text-[11px] font-medium transition-colors flex items-center gap-1 border border-blue-500/20"
+                              title="Advance to next stage"
+                            >
+                              Advance <ArrowRight className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* Table View */}
+      {/* ─── TABLE VIEW ─────────────────────────────────────────────────────── */}
       {view === 'table' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  {['Name', 'Client', 'Status', 'Priority', 'Progress', 'Deadline', 'Actions'].map(h => (
-                    <th key={h} className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                  ))}
+            <table className="w-full text-sm">
+              <thead className="bg-slate-900/90 border-b border-slate-800 text-xs uppercase font-medium text-slate-400">
+                <tr>
+                  <th className="text-left px-4 py-3">Project #</th>
+                  <th className="text-left px-4 py-3">Project Title</th>
+                  <th className="text-left px-4 py-3">Client</th>
+                  <th className="text-left px-4 py-3">Pipeline Stage (1-17)</th>
+                  <th className="text-right px-4 py-3">Budget (₹)</th>
+                  <th className="text-left px-4 py-3">Project Manager</th>
+                  <th className="text-left px-4 py-3">Deadline</th>
+                  <th className="text-right px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center text-slate-500">No projects found</td>
+                    <td colSpan={8} className="py-16 text-center text-slate-500">
+                      No matching projects found.
+                    </td>
                   </tr>
                 ) : (
-                  filtered.map(p => (
-                    <tr key={p.id} className="hover:bg-slate-800/50 transition-colors group">
-                      <td className="px-4 py-3.5">
-                        <div>
-                          <p className="text-sm font-medium text-slate-200">{p.name}</p>
-                          <div className="flex gap-1 mt-1 flex-wrap">
-                            {p.tech_stack.slice(0, 2).map(t => (
-                              <span key={t} className="px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded text-xs">{t}</span>
-                            ))}
+                  filtered.map(proj => {
+                    const client = clientMap[proj.client_id]
+                    const stageCfg = STAGE_MAP[proj.pipeline_stage || 'project_created'] || PIPELINE_STAGES[0]
+                    const priCfg = PRIORITY_CONFIG[proj.priority] || PRIORITY_CONFIG.medium
+
+                    return (
+                      <tr
+                        key={proj.id}
+                        onClick={() => setSelectedProject(proj)}
+                        className="hover:bg-slate-800/40 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-400">
+                          {proj.project_number || 'CS-PRJ-2026-XXX'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-100">{proj.name}</div>
+                          {proj.description && (
+                            <div className="text-xs text-slate-400 truncate max-w-xs">{proj.description}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-slate-200">{client?.business_name || client?.name || '—'}</div>
+                          <div className="text-xs text-slate-500">{client?.name}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/10 text-blue-300 border border-blue-500/20 whitespace-nowrap">
+                              {stageCfg.step}/17 {stageCfg.label}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-400">
+                              {stageCfg.progress}%
+                            </span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-sm text-slate-400">{clientMap[p.client_id]?.name ?? '—'}</td>
-                      <td className="px-4 py-3.5"><StatusBadge status={p.status} /></td>
-                      <td className="px-4 py-3.5"><PriorityBadge priority={p.priority} /></td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2 min-w-24">
-                          <ProgressBar value={p.progress} />
-                          <span className="text-xs text-slate-500 shrink-0">{p.progress}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-sm text-slate-400 whitespace-nowrap">{formatDate(p.deadline)}</td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openEdit(p)} className="p-1.5 text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors" title="Edit">
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          {p.staging_url && (
-                            <a href={p.staging_url} target="_blank" rel="noreferrer" className="p-1.5 text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors" title="Staging">
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-100">
+                          {formatCurrency(proj.budget || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-300">
+                          {proj.project_manager || 'Lead Architect'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-400">
+                          {formatDate(proj.expected_delivery_date || proj.deadline)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleAdvanceStage(proj)}
+                              className="px-2.5 py-1 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1 border border-blue-500/20"
+                              title="Advance to next pipeline stage"
+                            >
+                              Advance <ArrowRight className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => setSelectedProject(proj)}
+                              className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                              title="View Project Detail & Stepper"
+                            >
                               <ExternalLink className="w-4 h-4" />
-                            </a>
-                          )}
-                          {p.repository_url && (
-                            <a href={p.repository_url} target="_blank" rel="noreferrer" className="p-1.5 text-slate-500 hover:text-slate-200 hover:bg-slate-700 rounded-lg transition-colors" title="Repo">
-                              <GitBranch className="w-4 h-4" />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -500,14 +697,390 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      <ProjectModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSave}
-        initial={formInitial}
-        title={editProject ? 'Edit Project' : 'Add New Project'}
-        clients={clients}
-      />
+      {/* ─── PROJECT DETAIL & 17-STAGE STEPPER MODAL ───────────────────────── */}
+      {selectedProject && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setSelectedProject(null)}
+        >
+          <div
+            className="bg-slate-900 rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-800 space-y-6 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono text-sm font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
+                    {selectedProject.project_number || 'CS-PRJ-2026-XXX'}
+                  </span>
+                  <h2 className="text-xl font-bold text-slate-100">{selectedProject.name}</h2>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${(PRIORITY_CONFIG[selectedProject.priority] || PRIORITY_CONFIG.medium).badge}`}>
+                    {(PRIORITY_CONFIG[selectedProject.priority] || PRIORITY_CONFIG.medium).label} Priority
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Client: <strong className="text-slate-200">{clientMap[selectedProject.client_id]?.business_name || clientMap[selectedProject.client_id]?.name}</strong>
+                  {selectedProject.description && ` • ${selectedProject.description}`}
+                </p>
+              </div>
+              <button onClick={() => setSelectedProject(null)} className="text-slate-400 hover:text-slate-200 p-1.5">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+              <div>
+                <span className="text-[11px] font-medium text-slate-400 block uppercase">Project Budget</span>
+                <span className="text-base font-bold text-blue-400">{formatCurrency(selectedProject.budget || 0)}</span>
+              </div>
+              <div>
+                <span className="text-[11px] font-medium text-slate-400 block uppercase">Project Manager</span>
+                <span className="text-xs font-semibold text-slate-200 truncate block">{selectedProject.project_manager || 'Lead Architect'}</span>
+              </div>
+              <div>
+                <span className="text-[11px] font-medium text-slate-400 block uppercase">Start Date</span>
+                <span className="text-xs font-mono text-slate-300">{formatDate(selectedProject.start_date)}</span>
+              </div>
+              <div>
+                <span className="text-[11px] font-medium text-slate-400 block uppercase">Target Delivery</span>
+                <span className="text-xs font-mono text-slate-300">{formatDate(selectedProject.expected_delivery_date || selectedProject.deadline)}</span>
+              </div>
+            </div>
+
+            {/* ─── 17-Stage Visual Stepper Timeline ─────────────────────────── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    17-Stage Milestone Delivery Gate
+                  </h3>
+                  <p className="text-xs text-slate-400">Current Progress: {selectedProject.progress}% complete</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedProject.pipeline_stage || 'project_created'}
+                    onChange={e => handleSetSpecificStage(selectedProject, e.target.value as ProjectPipelineStage)}
+                    className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {PIPELINE_STAGES.map(s => (
+                      <option key={s.key} value={s.key}>
+                        Stage {s.step}: {s.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleAdvanceStage(selectedProject)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow transition-all"
+                  >
+                    Advance <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Stepper Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                {PIPELINE_STAGES.map(stage => {
+                  const currentStageCfg = STAGE_MAP[selectedProject.pipeline_stage || 'project_created']
+                  const isCurrent = stage.key === currentStageCfg?.key
+                  const isPast = stage.step < (currentStageCfg?.step || 1)
+
+                  return (
+                    <div
+                      key={stage.key}
+                      onClick={() => handleSetSpecificStage(selectedProject, stage.key)}
+                      className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-start gap-2.5 ${
+                        isCurrent
+                          ? 'bg-blue-600/20 border-blue-500 text-blue-100 shadow-md ring-1 ring-blue-500'
+                          : isPast
+                          ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200 hover:bg-emerald-900/30'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5 ${
+                        isCurrent
+                          ? 'bg-blue-500 text-white'
+                          : isPast
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {isPast ? <Check className="w-3 h-3" /> : stage.step}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold truncate">{stage.label}</div>
+                        <div className="text-[10px] text-slate-400 truncate">{stage.phase}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Development Team & Tech Stack */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-cyan-400" /> Development Team Roster
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(selectedProject.development_team && selectedProject.development_team.length > 0)
+                    ? selectedProject.development_team.map((t, idx) => (
+                        <span key={idx} className="px-2 py-1 bg-slate-800 text-slate-200 rounded-lg text-xs border border-slate-700">
+                          {t}
+                        </span>
+                      ))
+                    : <span className="text-xs text-slate-500">Core Engineering Team</span>
+                  }
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Code2 className="w-4 h-4 text-purple-400" /> Technology Architecture
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedProject.tech_stack?.map((tech, idx) => (
+                    <span key={idx} className="px-2 py-1 bg-purple-500/10 text-purple-300 rounded-lg text-xs border border-purple-500/20">
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Activity Log Stream */}
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Milestone Activity &amp; Stage Promotion Log
+              </h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {(!selectedProject.activity_log || selectedProject.activity_log.length === 0) ? (
+                  <div className="p-3 bg-slate-950/40 rounded-xl text-xs text-slate-500 text-center">
+                    Project initialized on {formatDate(selectedProject.created_at)}.
+                  </div>
+                ) : (
+                  selectedProject.activity_log.map((act, i) => (
+                    <div key={act.id || i} className="p-2.5 bg-slate-950/60 border border-slate-800/80 rounded-xl text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-200">{act.action}</span>
+                        <span className="text-[11px] font-mono text-slate-400">{formatDate(act.timestamp)}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Officer: <span className="text-slate-300">{act.performed_by}</span>
+                        {act.details && ` • ${act.details}`}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-800">
+              <button
+                onClick={() => setSelectedProject(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-medium transition-colors"
+              >
+                Close Project Overview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── CREATE PROJECT MODAL ──────────────────────────────────────────── */}
+      {showCreateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-800 space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-100">Initialize New Project</h3>
+                <p className="text-xs text-slate-400">Creates a tracked project with unique ID linked to client &amp; quotation</p>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProject} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Link to Approved Quotation</label>
+                  <select
+                    value={quotationId}
+                    onChange={e => handleQuotationSelect(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">None / Custom Project</option>
+                    {quotations.map(q => (
+                      <option key={q.id} value={q.id}>
+                        {q.quote_number} — {q.title} ({formatCurrency(q.total)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Client *</label>
+                  <select
+                    required
+                    value={clientId}
+                    onChange={e => setClientId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select a client...</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.business_name || c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Project Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Enterprise E-Commerce Platform & Payment Gateway"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Project Description &amp; Scope</label>
+                <textarea
+                  rows={2}
+                  placeholder="Brief summary of project scope, objectives and deliverables..."
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Project Budget (₹) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 75000"
+                    value={budget}
+                    onChange={e => setBudget(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Priority</label>
+                  <select
+                    value={priority}
+                    onChange={e => setPriority(e.target.value as ProjectPriority)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Expected Delivery Date</label>
+                  <input
+                    type="date"
+                    value={deadline}
+                    onChange={e => setDeadline(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Project Manager</label>
+                  <input
+                    type="text"
+                    value={projectManager}
+                    onChange={e => setProjectManager(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Agreement Reference (Optional)</label>
+                  <select
+                    value={agreementId}
+                    onChange={e => setAgreementId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">None</option>
+                    {agreements.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.agreement_number} — {a.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Development Team Members (comma-separated)</label>
+                <input
+                  type="text"
+                  value={teamMembersInput}
+                  onChange={e => setTeamMembersInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Technology Stack (comma-separated)</label>
+                <input
+                  type="text"
+                  value={techStackInput}
+                  onChange={e => setTechStackInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all"
+                >
+                  <Plus className="w-4 h-4" /> Create Project Record
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
