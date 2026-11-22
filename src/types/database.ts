@@ -362,8 +362,9 @@ export interface Agreement {
 }
 
 export type PaymentStatus = 'pending' | 'received' | 'failed' | 'refunded'
-export type PaymentType = 'advance' | 'milestone' | 'final' | 'maintenance' | 'other'
-export type PaymentMethod = 'bank_transfer' | 'card' | 'cash' | 'paypal' | 'other'
+export type PaymentType = 'advance' | 'milestone' | 'final' | 'additional_feature' | 'maintenance' | 'refund' | 'other'
+export type PaymentMethod = 'upi' | 'bank_transfer' | 'gateway' | 'card' | 'cash' | 'cheque' | 'paypal' | 'other'
+export type PaymentVerificationStatus = 'pending_verification' | 'verified' | 'rejected' | 'disputed'
 
 export interface Payment {
   id: string
@@ -372,11 +373,20 @@ export interface Payment {
   invoice_id: string | null
   agreement_id: string | null
   reference: string
+  receipt_number?: string | null
   amount: number
   currency: string
   payment_type: PaymentType
   payment_method: PaymentMethod
   status: PaymentStatus
+  verification_status?: PaymentVerificationStatus
+  verified_by?: string | null
+  verified_at?: string | null
+  verification_evidence?: string | null
+  recorded_by?: string | null
+  refund_reason?: string | null
+  refund_original_ref?: string | null
+  balance_after_payment?: number | null
   received_date: string | null
   notes: string | null
   proof_url: string | null
@@ -393,6 +403,14 @@ export interface InvoiceItem {
   total: number
 }
 
+export interface InvoiceAuditItem {
+  id: string
+  action: string
+  user: string
+  timestamp: string
+  reason?: string
+}
+
 export interface Invoice {
   id: string
   client_id: string
@@ -405,6 +423,17 @@ export interface Invoice {
   tax_rate: number
   tax_amount: number
   total: number
+  is_gst_applicable?: boolean
+  gst_type?: 'cgst_sgst' | 'igst' | 'none'
+  cgst_amount?: number
+  sgst_amount?: number
+  igst_amount?: number
+  amount_paid?: number
+  balance_due?: number
+  cancellation_reason?: string | null
+  cancelled_by?: string | null
+  cancelled_at?: string | null
+  audit_trail?: InvoiceAuditItem[]
   due_date: string | null
   paid_at: string | null
   status: InvoiceStatus

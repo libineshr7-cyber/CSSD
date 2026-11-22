@@ -1719,7 +1719,7 @@ export function downloadAgreementPDF(agreement: Agreement, client?: Client | nul
 }
 
 /**
- * Downloads a genuine binary .pdf file for the Tax Invoice
+ * Downloads a genuine binary .pdf file for the Tax Invoice or Commercial Bill
  */
 export function downloadInvoicePDF(invoice: Invoice, client?: Client | null, project?: Project | null) {
   const pdf = new PDFBuilder()
@@ -1732,6 +1732,10 @@ export function downloadInvoicePDF(invoice: Invoice, client?: Client | null, pro
   const clientAddress = client?.address || 'Kerala, India'
   const gstin = client?.gstin || 'Unregistered / Exempt'
 
+  const isCancelled = invoice.status === 'cancelled'
+  const isPaid = invoice.status === 'paid'
+  const isOverdue = invoice.status === 'overdue'
+
   // Header Bar
   pdf.fillRect(36, 36, 523, 72, 0.06, 0.09, 0.16)
   pdf.drawText('CAPE', 50, 52, { fontSize: 20, bold: true, r: 1, g: 1, b: 1 })
@@ -1739,27 +1743,41 @@ export function downloadInvoicePDF(invoice: Invoice, client?: Client | null, pro
   pdf.drawText('ENTERPRISE WEB ENGINEERING & CLOUD SECURITY', 50, 74, { fontSize: 7, bold: true, r: 0.6, g: 0.7, b: 0.85 })
   pdf.drawText('CapeSecure HQ, Kerala, India | contact@capesecure.com | https://capesecure.vercel.app', 50, 84, { fontSize: 7, r: 0.5, g: 0.6, b: 0.75 })
 
-  // Tax Invoice Badge on top right
-  pdf.fillRect(400, 48, 145, 48, 0.1, 0.15, 0.25)
-  pdf.drawText('TAX INVOICE', 472, 58, { fontSize: 13, bold: true, align: 'center', r: 1, g: 1, b: 1 })
-  pdf.drawText(`INV: ${invNumber}`, 472, 73, { fontSize: 8, bold: true, align: 'center', r: 0.2, g: 0.75, b: 1 })
-  pdf.drawText(`DATE: ${formatDate(invoice.created_at || new Date().toISOString())}`, 472, 84, { fontSize: 7, align: 'center', r: 0.7, g: 0.8, b: 0.9 })
+  // Document Type & Badge on top right
+  const isGST = invoice.is_gst_applicable !== false && invoice.gst_type !== 'none'
+  const docTitle = isCancelled
+    ? 'CANCELLED INVOICE'
+    : (!isGST ? 'BILL OF SUPPLY' : (invoice.gst_type === 'igst' ? 'TAX INVOICE (IGST)' : 'TAX INVOICE (GST)'))
+
+  pdf.fillRect(380, 48, 165, 48, 0.1, 0.15, 0.25)
+  pdf.drawText(docTitle, 462, 58, { fontSize: 10, bold: true, align: 'center', r: isCancelled ? 1 : 1, g: isCancelled ? 0.3 : 1, b: isCancelled ? 0.3 : 1 })
+  pdf.drawText(`INV: ${invNumber}`, 462, 72, { fontSize: 8, bold: true, align: 'center', r: 0.2, g: 0.75, b: 1 })
+  pdf.drawText(`DATE: ${formatDate(invoice.created_at || new Date().toISOString())}`, 462, 83, { fontSize: 7, align: 'center', r: 0.7, g: 0.8, b: 0.9 })
+
+  // Cancellation Banner if applicable
+  let curY = 118
+  if (isCancelled) {
+    pdf.fillRect(36, curY, 523, 26, 0.98, 0.9, 0.9)
+    pdf.strokeRect(36, curY, 523, 26, 0.8, 0.2, 0.2, 1)
+    pdf.drawText('DOCUMENT VOID / CANCELLED IN FINANCIAL AUDIT TRAIL', 297, curY + 6, { fontSize: 8, bold: true, align: 'center', r: 0.75, g: 0.1, b: 0.1 })
+    pdf.drawText(`Cancelled By: ${invoice.cancelled_by || 'Authorized Administrator'} | Reason: ${invoice.cancellation_reason || 'Amended / Corrected'}`, 297, curY + 16, { fontSize: 6.8, align: 'center', r: 0.5, g: 0.1, b: 0.1 })
+    curY += 32
+  }
 
   // Meta Section: Billed By vs Billed To
-  let curY = 120
   pdf.fillRect(36, curY, 255, 96, 0.97, 0.98, 0.99)
   pdf.strokeRect(36, curY, 255, 96, 0.85, 0.88, 0.92, 1)
-  pdf.drawText('ISSUED BY', 46, curY + 8, { fontSize: 8, bold: true, r: 0.2, g: 0.35, b: 0.6 })
+  pdf.drawText('ISSUED BY (SUPPLIER)', 46, curY + 8, { fontSize: 8, bold: true, r: 0.2, g: 0.35, b: 0.6 })
   pdf.drawText('CapeSecure Solutions LLP', 46, curY + 22, { fontSize: 9, bold: true, r: 0.1, g: 0.15, b: 0.25 })
   pdf.drawText('Kerala Technology Corridor, India', 46, curY + 34, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
   pdf.drawText('Email: billing@capesecure.com', 46, curY + 46, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
   pdf.drawText('Phone: +91 94892 23812', 46, curY + 58, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
   pdf.drawText('GSTIN: 32AABCC8921M1Z5 | PAN: AABCC8921M', 46, curY + 70, { fontSize: 7, bold: true, r: 0.2, g: 0.4, b: 0.55 })
-  pdf.drawText('Website: https://capesecure.vercel.app', 46, curY + 82, { fontSize: 7, r: 0.4, g: 0.45, b: 0.5 })
+  pdf.drawText('State of Supply: Kerala (Code 32)', 46, curY + 82, { fontSize: 7, r: 0.4, g: 0.45, b: 0.5 })
 
   pdf.fillRect(304, curY, 255, 96, 0.97, 0.98, 0.99)
   pdf.strokeRect(304, curY, 255, 96, 0.85, 0.88, 0.92, 1)
-  pdf.drawText('BILLED TO (CLIENT)', 314, curY + 8, { fontSize: 8, bold: true, r: 0.2, g: 0.35, b: 0.6 })
+  pdf.drawText('BILLED TO (RECIPIENT)', 314, curY + 8, { fontSize: 8, bold: true, r: 0.2, g: 0.35, b: 0.6 })
   pdf.drawText(companyName.substring(0, 32), 314, curY + 22, { fontSize: 9, bold: true, r: 0.1, g: 0.15, b: 0.25 })
   pdf.drawText(`Attn: ${clientName}`, 314, curY + 34, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
   pdf.drawText(`Email: ${clientEmail}`, 314, curY + 46, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
@@ -1768,14 +1786,14 @@ export function downloadInvoicePDF(invoice: Invoice, client?: Client | null, pro
   pdf.drawText(`GSTIN: ${gstin}`, 314, curY + 82, { fontSize: 7, bold: true, r: 0.2, g: 0.4, b: 0.55 })
 
   // Status & Due Date Bar
-  curY = 226
+  curY += 106
   pdf.fillRect(36, curY, 523, 30, 0.94, 0.96, 0.98)
   pdf.strokeRect(36, curY, 523, 30, 0.8, 0.85, 0.9, 1)
 
-  const isPaid = invoice.status === 'paid'
-  const isOverdue = invoice.status === 'overdue'
-
-  if (isPaid) {
+  if (isCancelled) {
+    pdf.fillRect(44, curY + 5, 80, 20, 0.7, 0.1, 0.1)
+    pdf.drawText('CANCELLED', 84, curY + 11, { fontSize: 8, bold: true, align: 'center', r: 1, g: 1, b: 1 })
+  } else if (isPaid) {
     pdf.fillRect(44, curY + 5, 80, 20, 0.1, 0.65, 0.3)
     pdf.drawText('PAID FULL', 84, curY + 11, { fontSize: 8, bold: true, align: 'center', r: 1, g: 1, b: 1 })
   } else if (isOverdue) {
@@ -1790,20 +1808,20 @@ export function downloadInvoicePDF(invoice: Invoice, client?: Client | null, pro
   if (project?.name) {
     pdf.drawText(`Project: ${project.name.substring(0, 30)}`, 320, curY + 11, { fontSize: 8, r: 0.25, g: 0.3, b: 0.4 })
   }
-  pdf.drawText(`Currency: INR (Rs.)`, 545, curY + 11, { fontSize: 8, bold: true, align: 'right', r: 0.15, g: 0.2, b: 0.3 })
+  pdf.drawText(`Currency: INR (₹)`, 545, curY + 11, { fontSize: 8, bold: true, align: 'right', r: 0.15, g: 0.2, b: 0.3 })
 
   // Line Items Table Header
-  curY = 268
+  curY += 42
   pdf.fillRect(36, curY, 523, 20, 0.1, 0.15, 0.25)
   pdf.drawText('#', 44, curY + 6, { fontSize: 7.5, bold: true, r: 1, g: 1, b: 1 })
   pdf.drawText('DESCRIPTION / SERVICE DELIVERABLE', 68, curY + 6, { fontSize: 7.5, bold: true, r: 1, g: 1, b: 1 })
   pdf.drawText('QTY', 370, curY + 6, { fontSize: 7.5, bold: true, r: 1, g: 1, b: 1 })
-  pdf.drawText('UNIT PRICE (Rs.)', 440, curY + 6, { fontSize: 7.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
-  pdf.drawText('AMOUNT (Rs.)', 545, curY + 6, { fontSize: 7.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
+  pdf.drawText('UNIT PRICE (₹)', 440, curY + 6, { fontSize: 7.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
+  pdf.drawText('AMOUNT (₹)', 545, curY + 6, { fontSize: 7.5, bold: true, align: 'right', r: 1, g: 1, b: 1 })
 
   curY += 20
   const items = (invoice.items && invoice.items.length > 0) ? invoice.items : [
-    { description: 'Professional Web Application Development & Deployment', quantity: 1, unit_price: invoice.total, total: invoice.total }
+    { description: 'Professional Web Application Development & Cloud Engineering', quantity: 1, unit_price: invoice.total, total: invoice.total }
   ]
 
   items.forEach((item, index) => {
@@ -1816,133 +1834,273 @@ export function downloadInvoicePDF(invoice: Invoice, client?: Client | null, pro
     pdf.drawText(String(index + 1), 44, curY + 7, { fontSize: 7.5, r: 0.4, g: 0.45, b: 0.5 })
     pdf.drawText(item.description.substring(0, 52), 68, curY + 7, { fontSize: 7.5, bold: true, r: 0.15, g: 0.2, b: 0.25 })
     pdf.drawText(String(item.quantity), 375, curY + 7, { fontSize: 7.5, r: 0.2, g: 0.25, b: 0.3 })
-    pdf.drawText(`Rs. ${item.unit_price.toLocaleString('en-IN')}`, 440, curY + 7, { fontSize: 7.5, align: 'right', r: 0.2, g: 0.25, b: 0.3 })
-    pdf.drawText(`Rs. ${item.total.toLocaleString('en-IN')}`, 545, curY + 7, { fontSize: 7.5, bold: true, align: 'right', r: 0.1, g: 0.15, b: 0.2 })
+    pdf.drawText(`₹ ${item.unit_price.toLocaleString('en-IN')}`, 440, curY + 7, { fontSize: 7.5, align: 'right', r: 0.2, g: 0.25, b: 0.3 })
+    pdf.drawText(`₹ ${item.total.toLocaleString('en-IN')}`, 545, curY + 7, { fontSize: 7.5, bold: true, align: 'right', r: 0.1, g: 0.15, b: 0.2 })
 
     curY += 22
   })
 
-  // Calculation Breakdown
+  // Calculation Breakdown Box
   curY += 12
-  const calcBoxX = 330
-  const calcBoxW = 229
+  const calcBoxX = 320
+  const calcBoxW = 239
 
-  pdf.fillRect(calcBoxX, curY, calcBoxW, 110, 0.97, 0.98, 0.99)
-  pdf.strokeRect(calcBoxX, curY, calcBoxW, 110, 0.85, 0.88, 0.92, 1)
+  const amountPaid = invoice.amount_paid !== undefined ? invoice.amount_paid : (isPaid ? invoice.total : 0)
+  const balanceDue = invoice.balance_due !== undefined ? invoice.balance_due : Math.max(0, invoice.total - amountPaid)
 
-  pdf.drawText('Subtotal:', calcBoxX + 10, curY + 12, { fontSize: 8, r: 0.35, g: 0.4, b: 0.45 })
-  pdf.drawText(`Rs. ${invoice.subtotal.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 12, { fontSize: 8, bold: true, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
+  pdf.fillRect(calcBoxX, curY, calcBoxW, 126, 0.97, 0.98, 0.99)
+  pdf.strokeRect(calcBoxX, curY, calcBoxW, 126, 0.85, 0.88, 0.92, 1)
+
+  pdf.drawText('Taxable Subtotal:', calcBoxX + 10, curY + 11, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+  pdf.drawText(`₹ ${invoice.subtotal.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 11, { fontSize: 7.5, bold: true, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
 
   if (invoice.discount && invoice.discount > 0) {
-    pdf.drawText('Discount Applied:', calcBoxX + 10, curY + 28, { fontSize: 8, r: 0.2, g: 0.55, b: 0.3 })
-    pdf.drawText(`- Rs. ${invoice.discount.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 28, { fontSize: 8, bold: true, align: 'right', r: 0.2, g: 0.55, b: 0.3 })
+    pdf.drawText('Discount Applied:', calcBoxX + 10, curY + 23, { fontSize: 7.5, r: 0.2, g: 0.55, b: 0.3 })
+    pdf.drawText(`- ₹ ${invoice.discount.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 23, { fontSize: 7.5, bold: true, align: 'right', r: 0.2, g: 0.55, b: 0.3 })
   }
 
-  const taxLabel = `GST (${invoice.tax_rate || 18}%):`
-  pdf.drawText(taxLabel, calcBoxX + 10, curY + 44, { fontSize: 8, r: 0.35, g: 0.4, b: 0.45 })
-  pdf.drawText(`Rs. ${(invoice.tax_amount || 0).toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 44, { fontSize: 8, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
-
-  pdf.line(calcBoxX + 8, curY + 58, calcBoxX + calcBoxW - 8, curY + 58, 0.75, 0.8, 0.88, 1)
-
-  // Grand Total Highlight
-  pdf.fillRect(calcBoxX + 4, curY + 62, calcBoxW - 8, 22, 0.08, 0.12, 0.2)
-  pdf.drawText('TOTAL PAYABLE:', calcBoxX + 10, curY + 69, { fontSize: 8.5, bold: true, r: 1, g: 1, b: 1 })
-  pdf.drawText(`Rs. ${invoice.total.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 69, { fontSize: 10, bold: true, align: 'right', r: 0.1, g: 0.8, b: 0.4 })
-
-  if (isPaid) {
-    pdf.drawText('Paid in Full (Zero Balance)', calcBoxX + calcBoxW / 2, curY + 95, { fontSize: 7.5, bold: true, align: 'center', r: 0.1, g: 0.6, b: 0.25 })
+  if (isGST) {
+    if (invoice.gst_type === 'igst') {
+      pdf.drawText('Integrated GST (IGST 18%):', calcBoxX + 10, curY + 35, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+      pdf.drawText(`₹ ${(invoice.tax_amount || 0).toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 35, { fontSize: 7.5, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
+    } else {
+      const halfTax = (invoice.tax_amount || 0) / 2
+      pdf.drawText('Central GST (CGST 9%):', calcBoxX + 10, curY + 35, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+      pdf.drawText(`₹ ${halfTax.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 35, { fontSize: 7.5, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
+      pdf.drawText('State GST (SGST 9%):', calcBoxX + 10, curY + 47, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+      pdf.drawText(`₹ ${halfTax.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 47, { fontSize: 7.5, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
+    }
   } else {
-    pdf.drawText('Payment Due Upon Presentation', calcBoxX + calcBoxW / 2, curY + 95, { fontSize: 7.5, align: 'center', r: 0.5, g: 0.4, b: 0.1 })
+    pdf.drawText('GST: Non-GST / Exempt (0%):', calcBoxX + 10, curY + 35, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
+    pdf.drawText('₹ 0.00', calcBoxX + calcBoxW - 10, curY + 35, { fontSize: 7.5, align: 'right', r: 0.15, g: 0.2, b: 0.25 })
   }
+
+  pdf.line(calcBoxX + 8, curY + 59, calcBoxX + calcBoxW - 8, curY + 59, 0.75, 0.8, 0.88, 1)
+
+  // Total Invoice Value
+  pdf.drawText('Total Invoice Value:', calcBoxX + 10, curY + 68, { fontSize: 8, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+  pdf.drawText(`₹ ${invoice.total.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 68, { fontSize: 8.5, bold: true, align: 'right', r: 0.1, g: 0.15, b: 0.25 })
+
+  // Less Advance / Amount Paid
+  pdf.drawText('Less: Amount Paid / Advance:', calcBoxX + 10, curY + 80, { fontSize: 7.5, r: 0.15, g: 0.55, b: 0.25 })
+  pdf.drawText(`- ₹ ${amountPaid.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 80, { fontSize: 7.5, bold: true, align: 'right', r: 0.15, g: 0.55, b: 0.25 })
+
+  // Net Balance Due
+  pdf.fillRect(calcBoxX + 4, curY + 92, calcBoxW - 8, 26, 0.08, 0.12, 0.2)
+  pdf.drawText('NET BALANCE DUE:', calcBoxX + 10, curY + 100, { fontSize: 8.5, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText(`₹ ${balanceDue.toLocaleString('en-IN')}`, calcBoxX + calcBoxW - 10, curY + 100, { fontSize: 10, bold: true, align: 'right', r: balanceDue === 0 ? 0.2 : 1, g: balanceDue === 0 ? 0.9 : 0.6, b: balanceDue === 0 ? 0.4 : 0.2 })
 
   // Banking & Payment Details (Left Box)
-  pdf.fillRect(36, curY, 280, 110, 0.97, 0.98, 0.99)
-  pdf.strokeRect(36, curY, 280, 110, 0.85, 0.88, 0.92, 1)
+  pdf.fillRect(36, curY, 270, 126, 0.97, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 270, 126, 0.85, 0.88, 0.92, 1)
   pdf.drawText('BANK & PAYMENT SETTLEMENT DETAILS', 46, curY + 10, { fontSize: 8, bold: true, r: 0.1, g: 0.35, b: 0.65 })
   pdf.drawText('Beneficiary Name: CapeSecure Solutions LLP', 46, curY + 26, { fontSize: 7.5, bold: true, r: 0.15, g: 0.2, b: 0.25 })
   pdf.drawText('Bank: State Bank of India / HDFC Bank', 46, curY + 38, { fontSize: 7.5, r: 0.35, g: 0.4, b: 0.45 })
   pdf.drawText('Account Number: 418299100234', 46, curY + 50, { fontSize: 7.5, bold: true, r: 0.15, g: 0.2, b: 0.25 })
   pdf.drawText('IFSC Code: SBIN0001234', 46, curY + 62, { fontSize: 7.5, bold: true, r: 0.15, g: 0.2, b: 0.25 })
-  pdf.drawText('UPI ID: capesecure@upi', 46, curY + 74, { fontSize: 7.5, bold: true, r: 0.05, g: 0.5, b: 0.8 })
-  pdf.drawText('Please quote invoice number as transaction reference.', 46, curY + 90, { fontSize: 6.8, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText('UPI ID: capesecure@upi (GPay / PhonePe / Paytm)', 46, curY + 74, { fontSize: 7.5, bold: true, r: 0.05, g: 0.5, b: 0.8 })
+  pdf.drawText('Reference: Quote invoice number in transaction note.', 46, curY + 88, { fontSize: 6.8, r: 0.45, g: 0.5, b: 0.55 })
+  if (!isGST) {
+    pdf.drawText('* Non-GST Invoice issued under composition/exemption scheme.', 46, curY + 106, { fontSize: 6.5, r: 0.5, g: 0.3, b: 0.1 })
+  }
 
-  // Notes & Legal Notice
-  curY += 125
-  pdf.fillRect(36, curY, 523, 56, 0.98, 0.98, 0.99)
-  pdf.strokeRect(36, curY, 523, 56, 0.88, 0.9, 0.93, 1)
+  // Terms & Legal Notice
+  curY += 138
+  pdf.fillRect(36, curY, 523, 50, 0.98, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 523, 50, 0.88, 0.9, 0.93, 1)
   pdf.drawText('TERMS & PAYMENT CONDITIONS', 44, curY + 8, { fontSize: 7.5, bold: true, r: 0.25, g: 0.3, b: 0.4 })
-  pdf.drawText('1. Payment is strictly required within terms. Overdue accounts subject to 1.5% monthly service charge.', 44, curY + 20, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
-  pdf.drawText('2. All intellectual property in delivered web assets transfers to client upon receipt of full settlement.', 44, curY + 31, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
-  pdf.drawText('3. This is an electronically generated and authenticated Tax Invoice valid under Indian IT Act 2000.', 44, curY + 42, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
+  pdf.drawText('1. Advance payments are non-refundable once engineering sprints have commenced.', 44, curY + 19, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
+  pdf.drawText('2. Electronic verification required: Payments are settled only upon bank UTR or gateway confirmation.', 44, curY + 29, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
+  pdf.drawText('3. This document is authenticated under the Indian IT Act 2000 and GST Rules 2017.', 44, curY + 39, { fontSize: 6.8, r: 0.4, g: 0.45, b: 0.5 })
 
   // Authorization Signatures
-  curY += 70
-  pdf.line(360, curY + 36, 540, curY + 36, 0.6, 0.65, 0.7, 1)
-  pdf.drawText('Authorized Signatory for CapeSecure Solutions', 450, curY + 44, { fontSize: 7, bold: true, align: 'center', r: 0.2, g: 0.25, b: 0.3 })
-  pdf.drawText('Computer Generated • No Physical Signature Required', 450, curY + 54, { fontSize: 6.5, align: 'center', r: 0.5, g: 0.55, b: 0.6 })
+  curY += 62
+  pdf.line(360, curY + 30, 540, curY + 30, 0.6, 0.65, 0.7, 1)
+  pdf.drawText('Authorized Signatory for CapeSecure Solutions', 450, curY + 38, { fontSize: 7, bold: true, align: 'center', r: 0.2, g: 0.25, b: 0.3 })
+  pdf.drawText('Finance & Accounts Department • Computer Verified', 450, curY + 48, { fontSize: 6.5, align: 'center', r: 0.5, g: 0.55, b: 0.6 })
 
   // Footer
   pdf.line(36, 785, 559, 785, 0.85, 0.88, 0.92, 1)
   pdf.drawText(`CapeSecure Tax Invoice • Ref: ${invNumber} • https://capesecure.vercel.app`, 36, 795, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
-  pdf.drawText('Thank you for your business!', 559, 795, { fontSize: 7.5, bold: true, align: 'right', r: 0.2, g: 0.5, b: 0.8 })
+  pdf.drawText('Thank you for choosing CapeSecure Solutions!', 559, 795, { fontSize: 7.5, bold: true, align: 'right', r: 0.2, g: 0.5, b: 0.8 })
 
   pdf.download(`CapeSecure-Invoice-${invSafe}.pdf`)
 }
 
 /**
- * Downloads a genuine binary .pdf file for a Payment Receipt
+ * Downloads a genuine binary .pdf file for a Verified Payment Receipt
  */
 export function downloadReceiptPDF(payment: Payment, client?: Client | null, invoice?: Invoice | null) {
   const pdf = new PDFBuilder()
-  const ref = payment.reference || 'PAY-2026-001'
-  const refSafe = ref.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const recNumber = payment.receipt_number || `CS-REC-2026-${payment.reference.replace(/[^0-9]/g, '').slice(-3) || '001'}`
+  const recSafe = recNumber.replace(/[^a-zA-Z0-9_-]/g, '_')
   const clientName = client?.name || 'Valued Client'
   const companyName = client?.business_name || client?.company || clientName
+  const isVerified = payment.verification_status === 'verified' || payment.status === 'received'
 
   // Header Bar
   pdf.fillRect(36, 36, 523, 72, 0.06, 0.09, 0.16)
   pdf.drawText('CAPE', 50, 52, { fontSize: 20, bold: true, r: 1, g: 1, b: 1 })
   pdf.drawText('SECURE', 105, 52, { fontSize: 20, bold: true, r: 0.05, g: 0.6, b: 1 })
-  pdf.drawText('PAYMENT RECEIPT & TRANSACTION ACKNOWLEDGEMENT', 50, 74, { fontSize: 7, bold: true, r: 0.6, g: 0.7, b: 0.85 })
-  pdf.drawText('CapeSecure HQ, Kerala, India | contact@capesecure.com', 50, 84, { fontSize: 7, r: 0.5, g: 0.6, b: 0.75 })
+  pdf.drawText('FINANCIAL ACCOUNTS & SETTLEMENT DIVISION', 50, 74, { fontSize: 7, bold: true, r: 0.6, g: 0.7, b: 0.85 })
+  pdf.drawText('CapeSecure HQ, Kerala, India | billing@capesecure.com | +91 94892 23812', 50, 84, { fontSize: 7, r: 0.5, g: 0.6, b: 0.75 })
 
-  pdf.fillRect(390, 48, 155, 48, 0.1, 0.15, 0.25)
-  pdf.drawText('PAYMENT RECEIPT', 467, 58, { fontSize: 11, bold: true, align: 'center', r: 1, g: 1, b: 1 })
-  pdf.drawText(`REF: ${ref}`, 467, 72, { fontSize: 8, bold: true, align: 'center', r: 0.1, g: 0.8, b: 0.4 })
-  pdf.drawText(`DATE: ${formatDate(payment.received_date || payment.created_at)}`, 467, 83, { fontSize: 7, align: 'center', r: 0.7, g: 0.8, b: 0.9 })
+  // Receipt Number Stamp
+  pdf.fillRect(380, 48, 165, 48, 0.1, 0.15, 0.25)
+  pdf.drawText('OFFICIAL RECEIPT', 462, 58, { fontSize: 10, bold: true, align: 'center', r: 1, g: 1, b: 1 })
+  pdf.drawText(`REC: ${recNumber}`, 462, 72, { fontSize: 8.5, bold: true, align: 'center', r: 0.1, g: 0.8, b: 0.4 })
+  pdf.drawText(`DATE: ${formatDate(payment.received_date || payment.created_at)}`, 462, 83, { fontSize: 7, align: 'center', r: 0.7, g: 0.8, b: 0.9 })
 
-  let curY = 130
-  pdf.fillRect(36, curY, 523, 50, 0.94, 0.98, 0.95)
-  pdf.strokeRect(36, curY, 523, 50, 0.65, 0.85, 0.7, 1)
-  pdf.drawText('PAYMENT RECEIVED WITH THANKS', 297, curY + 12, { fontSize: 10, bold: true, align: 'center', r: 0.1, g: 0.5, b: 0.25 })
-  pdf.drawText(`Amount Received: Rs. ${Number(payment.amount).toLocaleString('en-IN')}`, 297, curY + 28, { fontSize: 13, bold: true, align: 'center', r: 0.08, g: 0.4, b: 0.2 })
+  let curY = 125
+  // Payment Received Box
+  pdf.fillRect(36, curY, 523, 56, 0.94, 0.98, 0.95)
+  pdf.strokeRect(36, curY, 523, 56, 0.65, 0.85, 0.7, 1)
+  pdf.drawText('PAYMENT RECEIVED & ELECTRONICALLY VERIFIED', 297, curY + 12, { fontSize: 9.5, bold: true, align: 'center', r: 0.1, g: 0.5, b: 0.25 })
+  pdf.drawText(`Amount Received: ₹ ${Number(payment.amount).toLocaleString('en-IN')}`, 297, curY + 28, { fontSize: 14, bold: true, align: 'center', r: 0.08, g: 0.4, b: 0.2 })
+  pdf.drawText(`(${payment.payment_type ? payment.payment_type.toUpperCase().replace('_', ' ') : 'PAYMENT'} SETTLEMENT)`, 297, curY + 44, { fontSize: 7, bold: true, align: 'center', r: 0.25, g: 0.45, b: 0.3 })
 
-  curY = 200
-  pdf.fillRect(36, curY, 523, 130, 0.98, 0.98, 0.99)
-  pdf.strokeRect(36, curY, 523, 130, 0.85, 0.88, 0.92, 1)
+  // Transaction Breakdown Details
+  curY += 70
+  pdf.fillRect(36, curY, 523, 190, 0.98, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 523, 190, 0.85, 0.88, 0.92, 1)
+
+  const remainingBalance = payment.balance_after_payment !== undefined && payment.balance_after_payment !== null
+    ? payment.balance_after_payment
+    : (invoice ? Math.max(0, invoice.total - Number(payment.amount)) : 0)
 
   const rows = [
-    ['Payer / Client:', `${companyName} (${clientName})`],
+    ['Receipt Number:', recNumber],
+    ['Client / Entity Name:', `${companyName} (${clientName})`],
+    ['Client GSTIN / Tax ID:', client?.gstin || 'Unregistered / Exempt'],
+    ['Payment Type:', (payment.payment_type || 'Advance Payment').toUpperCase().replace('_', ' ')],
     ['Payment Method:', (payment.payment_method || 'Bank Transfer').toUpperCase()],
-    ['Payment Type:', (payment.payment_type || 'Advance Payment').toUpperCase()],
-    ['Status:', (payment.status || 'Received').toUpperCase()],
-    ['Invoice Reference:', invoice?.invoice_number || 'Direct Account Credit'],
-    ['Transaction Reference:', payment.reference],
+    ['Transaction Reference / UTR:', payment.reference],
+    ['Related Invoice Number:', invoice?.invoice_number || 'Direct Account Credit'],
+    ['Total Invoice Value:', invoice ? `₹ ${invoice.total.toLocaleString('en-IN')}` : 'Direct Credit'],
+    ['Amount Credited in this Transaction:', `₹ ${Number(payment.amount).toLocaleString('en-IN')}`],
+    ['Remaining Balance on Account / Invoice:', `₹ ${remainingBalance.toLocaleString('en-IN')}`],
   ]
 
   rows.forEach(([k, v], idx) => {
-    const rowY = curY + 12 + (idx * 19)
-    pdf.drawText(k, 50, rowY, { fontSize: 8, bold: true, r: 0.35, g: 0.4, b: 0.45 })
-    pdf.drawText(v, 220, rowY, { fontSize: 8, r: 0.15, g: 0.2, b: 0.25 })
-    pdf.line(50, rowY + 14, 545, rowY + 14, 0.92, 0.93, 0.95, 0.5)
+    const rowY = curY + 12 + (idx * 17)
+    pdf.drawText(k, 50, rowY, { fontSize: 7.5, bold: true, r: 0.35, g: 0.4, b: 0.45 })
+    pdf.drawText(v, 240, rowY, { fontSize: 7.5, bold: idx >= 8, r: idx >= 8 ? (idx === 8 ? 0.1 : 0.8) : 0.15, g: idx >= 8 ? (idx === 8 ? 0.5 : 0.2) : 0.2, b: idx >= 8 ? 0.2 : 0.25 })
+    pdf.line(50, rowY + 13, 545, rowY + 13, 0.92, 0.93, 0.95, 0.5)
   })
+
+  // Verification Evidence Box
+  curY += 205
+  pdf.fillRect(36, curY, 523, 44, 0.95, 0.98, 0.96)
+  pdf.strokeRect(36, curY, 523, 44, 0.7, 0.85, 0.72, 1)
+  pdf.drawText('VERIFICATION AUDIT EVIDENCE (IN COMPLIANCE WITH FINANCIAL SECURITY MANDATE)', 46, curY + 8, { fontSize: 7, bold: true, r: 0.1, g: 0.45, b: 0.2 })
+  pdf.drawText(`Status: ${isVerified ? 'VERIFIED AGAINST BANK STATEMENT / GATEWAY SETTLEMENT' : 'PENDING FINAL RECONCILIATION'}`, 46, curY + 19, { fontSize: 7, bold: true, r: isVerified ? 0.1 : 0.8, g: isVerified ? 0.5 : 0.3, b: isVerified ? 0.2 : 0.1 })
+  pdf.drawText(`Verified By: ${payment.verified_by || 'Finance Compliance Officer'} | Evidence Reference: ${payment.verification_evidence || payment.reference}`, 46, curY + 29, { fontSize: 6.8, r: 0.25, g: 0.4, b: 0.3 })
+
+  // Signatures
+  curY += 60
+  pdf.line(360, curY + 32, 540, curY + 32, 0.6, 0.65, 0.7, 1)
+  pdf.drawText('Authorized Financial Signatory', 450, curY + 40, { fontSize: 7, bold: true, align: 'center', r: 0.2, g: 0.25, b: 0.3 })
+  pdf.drawText('CapeSecure Treasury & Accounts • Digitally Authenticated', 450, curY + 50, { fontSize: 6.5, align: 'center', r: 0.5, g: 0.55, b: 0.6 })
 
   // Footer
   pdf.line(36, 785, 559, 785, 0.85, 0.88, 0.92, 1)
-  pdf.drawText(`CapeSecure Payment Receipt • Ref: ${ref} • Verified`, 36, 795, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText(`CapeSecure Payment Receipt • Ref: ${recNumber} • Tamper-proof Financial Record`, 36, 795, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText('Page 1 of 1', 559, 795, { fontSize: 7.5, align: 'right', r: 0.45, g: 0.5, b: 0.55 })
 
-  pdf.download(`CapeSecure-Receipt-${refSafe}.pdf`)
+  pdf.download(`CapeSecure-Receipt-${recSafe}.pdf`)
 }
+
+/**
+ * Downloads a comprehensive PDF Financial Audit Report
+ */
+export function downloadFinancialReportPDF(data: {
+  totalInvoiced: number
+  totalCollected: number
+  outstandingPayments: number
+  overdueInvoices: number
+  advancePayments: number
+  maintenanceRevenue: number
+  refundsTotal: number
+  annualRevenue: number
+  invoicesCount: number
+  paymentsCount: number
+}) {
+  const pdf = new PDFBuilder()
+  const reportDate = formatDate(new Date().toISOString())
+
+  // Header Bar
+  pdf.fillRect(36, 36, 523, 72, 0.06, 0.09, 0.16)
+  pdf.drawText('CAPE', 50, 52, { fontSize: 20, bold: true, r: 1, g: 1, b: 1 })
+  pdf.drawText('SECURE', 105, 52, { fontSize: 20, bold: true, r: 0.05, g: 0.6, b: 1 })
+  pdf.drawText('ANNUAL FINANCIAL AUDIT & REVENUE PERFORMANCE REPORT', 50, 74, { fontSize: 7, bold: true, r: 0.6, g: 0.7, b: 0.85 })
+  pdf.drawText('CapeSecure HQ, Kerala, India | Confidential Executive Document', 50, 84, { fontSize: 7, r: 0.5, g: 0.6, b: 0.75 })
+
+  pdf.fillRect(400, 48, 145, 48, 0.1, 0.15, 0.25)
+  pdf.drawText('FINANCE AUDIT', 472, 58, { fontSize: 10, bold: true, align: 'center', r: 1, g: 1, b: 1 })
+  pdf.drawText(`FY 2026-27`, 472, 72, { fontSize: 8.5, bold: true, align: 'center', r: 0.2, g: 0.75, b: 1 })
+  pdf.drawText(`DATE: ${reportDate}`, 472, 83, { fontSize: 7, align: 'center', r: 0.7, g: 0.8, b: 0.9 })
+
+  let curY = 125
+  pdf.drawText('EXECUTIVE SUMMARY & FINANCIAL METRICS', 36, curY, { fontSize: 10, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+
+  curY += 15
+  const metrics = [
+    ['Total Invoiced Amount:', `₹ ${data.totalInvoiced.toLocaleString('en-IN')}`],
+    ['Total Verified Collections:', `₹ ${data.totalCollected.toLocaleString('en-IN')}`],
+    ['Outstanding Payments Due:', `₹ ${data.outstandingPayments.toLocaleString('en-IN')}`],
+    ['Overdue Invoice Balance:', `₹ ${data.overdueInvoices.toLocaleString('en-IN')}`],
+    ['Advance Payments Received (50% Milestone):', `₹ ${data.advancePayments.toLocaleString('en-IN')}`],
+    ['Recurring Maintenance Revenue:', `₹ ${data.maintenanceRevenue.toLocaleString('en-IN')}`],
+    ['Refunds & Adjustments Issued:', `₹ ${data.refundsTotal.toLocaleString('en-IN')}`],
+    ['Annual Projected Revenue:', `₹ ${data.annualRevenue.toLocaleString('en-IN')}`],
+    ['Total Invoices Issued:', String(data.invoicesCount)],
+    ['Total Verified Payment Receipts:', String(data.paymentsCount)],
+  ]
+
+  pdf.fillRect(36, curY, 523, 210, 0.98, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 523, 210, 0.85, 0.88, 0.92, 1)
+
+  metrics.forEach(([label, val], idx) => {
+    const rowY = curY + 12 + (idx * 19)
+    pdf.drawText(label, 50, rowY, { fontSize: 8, bold: true, r: 0.35, g: 0.4, b: 0.45 })
+    pdf.drawText(val, 530, rowY, { fontSize: 8.5, bold: true, align: 'right', r: 0.1, g: 0.2, b: 0.35 })
+    pdf.line(50, rowY + 14, 530, rowY + 14, 0.92, 0.93, 0.95, 0.5)
+  })
+
+  curY += 235
+  pdf.drawText('REGULATORY & AUDIT COMPLIANCE STATEMENTS', 36, curY, { fontSize: 9.5, bold: true, r: 0.1, g: 0.15, b: 0.25 })
+
+  curY += 14
+  pdf.fillRect(36, curY, 523, 80, 0.97, 0.98, 0.99)
+  pdf.strokeRect(36, curY, 523, 80, 0.85, 0.88, 0.92, 1)
+
+  const complianceNotes = [
+    '1. Bank Settlement Verification: No payment is recognized as collected without bank statement or gateway webhook evidence.',
+    '2. GST Invoicing Standards: All tax invoices adhere to Indian GST Act 2017 with CGST/SGST/IGST separation.',
+    '3. Non-GST Billing Exemption: Commercial bills of supply issued where client or threshold conditions apply.',
+    '4. Document Integrity: Invoices and receipts cannot be silently modified; all revisions are tracked in financial audit logs.',
+  ]
+
+  complianceNotes.forEach((note, idx) => {
+    pdf.drawText(note, 46, curY + 12 + (idx * 16), { fontSize: 7, r: 0.35, g: 0.4, b: 0.45 })
+  })
+
+  // Signatures
+  curY += 105
+  pdf.line(50, curY + 36, 230, curY + 36, 0.6, 0.65, 0.7, 1)
+  pdf.drawText('Chief Financial Officer', 140, curY + 44, { fontSize: 7, bold: true, align: 'center', r: 0.2, g: 0.25, b: 0.3 })
+
+  pdf.line(360, curY + 36, 540, curY + 36, 0.6, 0.65, 0.7, 1)
+  pdf.drawText('Managing Director / Principal Architect', 450, curY + 44, { fontSize: 7, bold: true, align: 'center', r: 0.2, g: 0.25, b: 0.3 })
+
+  // Footer
+  pdf.line(36, 785, 559, 785, 0.85, 0.88, 0.92, 1)
+  pdf.drawText(`CapeSecure Financial Report • FY 2026-27 • Generated on ${reportDate}`, 36, 795, { fontSize: 7.5, r: 0.45, g: 0.5, b: 0.55 })
+  pdf.drawText('Page 1 of 1 • Strict Confidentiality', 559, 795, { fontSize: 7.5, align: 'right', r: 0.45, g: 0.5, b: 0.55 })
+
+  pdf.download(`CapeSecure-Financial-Report-${new Date().toISOString().slice(0, 10)}.pdf`)
+}
+
 
 
 
