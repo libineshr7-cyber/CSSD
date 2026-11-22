@@ -30,6 +30,7 @@ import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
 import PublicQuotationPage from './pages/public/PublicQuotationPage'
+import ClientPortalPage from './pages/public/ClientPortalPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -40,6 +41,8 @@ function AppRoutes() {
     <Routes>
       {/* ── CapeSecure Public Website & Client Quotation Portal ── */}
       <Route path="/" element={<PublicHomePage />} />
+      <Route path="/portal" element={<ClientPortalPage />} />
+      <Route path="/client/portal" element={<Navigate to="/portal" replace />} />
       <Route path="/quote/:id" element={<PublicQuotationPage />} />
 
       {/* ── Auth Flow Routes ── */}

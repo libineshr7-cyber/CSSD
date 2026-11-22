@@ -289,6 +289,16 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <div className="mt-4 pt-4 border-t border-[#E5E5E5] dark:border-[#383838] text-center">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Looking for your client workspace?{' '}
+            <Link to="/portal" className="text-[#0D99FF] hover:underline font-semibold inline-flex items-center gap-1">
+              <span>Go to Client Portal</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          </p>
+        </div>
+
         <p className="text-center text-slate-400 text-[11px] mt-6">
           CapeSecure Business Management System &copy; {new Date().getFullYear()} · Row Level Security Enabled
         </p>

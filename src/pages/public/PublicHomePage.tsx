@@ -68,6 +68,13 @@ export default function PublicHomePage() {
 
           <div className="flex items-center gap-3">
             <Link
+              to="/portal"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-[#282828] text-slate-700 dark:text-slate-200 border border-[#E5E5E5] dark:border-[#383838] hover:border-[#0D99FF] transition-all"
+            >
+              <Shield className="w-3.5 h-3.5 text-[#0D99FF]" />
+              <span>Client Portal</span>
+            </Link>
+            <Link
               to="/admin"
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#0D99FF] hover:bg-[#007BE5] text-white shadow-xs transition-all"
             >

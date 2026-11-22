@@ -609,18 +609,82 @@ export interface SupportTicket {
   updated_at: string
 }
 
+export type DocumentCategory =
+  | 'Enquiry documents'
+  | 'Requirements'
+  | 'Quotations'
+  | 'Agreements'
+  | 'Invoices'
+  | 'Payment receipts'
+  | 'Design files'
+  | 'Development documents'
+  | 'Testing reports'
+  | 'Deployment records'
+  | 'Handover documents'
+  | 'Maintenance agreements'
+  | 'Support records'
+
+export interface DocumentVersionHistoryItem {
+  version: number
+  uploaded_at: string
+  uploaded_by: string
+  file_url: string
+  file_size?: number
+  notes?: string
+}
+
+export interface DocumentAccessLogItem {
+  id: string
+  user: string
+  action: 'viewed' | 'downloaded' | 'previewed' | 'signed_url_generated'
+  timestamp: string
+  ip_address?: string
+}
+
 export interface Document {
   id: string
   client_id: string | null
   project_id: string | null
   name: string
   description: string | null
-  category: string
+  category: DocumentCategory | string
   file_url: string
+  storage_path?: string | null
   file_size: number | null
   file_type: string | null
+  version?: number
+  uploaded_by?: string | null
   is_private: boolean
+  archived?: boolean
+  retention_policy?: string
+  version_history?: DocumentVersionHistoryItem[]
+  access_history?: DocumentAccessLogItem[]
   tags: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface BackupSchedule {
+  id: string
+  backup_type: 'database_snapshot' | 'storage_replication' | 'secondary_cold_archive'
+  snapshot_id: string
+  size_bytes: number
+  integrity_hash: string
+  retention_policy: string
+  verification_status: 'verified' | 'pending' | 'failed'
+  last_restoration_drill: string | null
+  storage_destination: string
+  created_at: string
+}
+
+export interface ClientPortalAccess {
+  id: string
+  client_id: string
+  portal_email: string
+  portal_passcode_hash?: string
+  is_active: boolean
+  last_login: string | null
+  login_attempts: number
   created_at: string
   updated_at: string
 }
