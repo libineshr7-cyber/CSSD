@@ -150,16 +150,41 @@ export default function MonitoringPage() {
         formattedUrl = 'https://' + formattedUrl
       }
 
+      // Perform initial live ping to detect genuine status
+      let initialStatus: WebsiteUptimeStatus = 'up'
+      let initialHttp = 200
+      let initialLatency = 85
+
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        const t0 = performance.now()
+        await fetch(formattedUrl, {
+          method: 'GET',
+          mode: 'no-cors',
+          cache: 'no-store',
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+        initialLatency = Math.max(12, Math.round(performance.now() - t0))
+        initialStatus = 'up'
+        initialHttp = 200
+      } catch (err) {
+        initialStatus = 'down'
+        initialHttp = 503
+        initialLatency = 0
+      }
+
       const newSite: Partial<MonitoredWebsite> = {
         client_id: formClientId,
         project_id: formProjectId || null,
         name: formName.trim(),
         url: formattedUrl,
-        status: 'up',
-        http_status: 200,
-        response_time_ms: Math.floor(Math.random() * 60 + 75),
-        uptime_percentage: 99.98,
-        ssl_status: 'valid',
+        status: initialStatus,
+        http_status: initialHttp,
+        response_time_ms: initialLatency,
+        uptime_percentage: initialStatus === 'up' ? 99.98 : 0.0,
+        ssl_status: formattedUrl.startsWith('https://') ? 'valid' : 'expired',
         ssl_valid_to: new Date(Date.now() + 85 * 86400000).toISOString(),
         ssl_days_remaining: 85,
         ssl_issuer: "Let's Encrypt Authority X3",
@@ -207,7 +232,7 @@ export default function MonitoringPage() {
     setFormBackupStatus('unverified')
   }
 
-  // Safe Heartbeat Probe (Avoids excessive requests with debouncing)
+  // Safe Real-Time Heartbeat Probe (Performs live network ping with timeout)
   const runHeartbeatProbe = async () => {
     if (websites.length === 0) {
       toast.error('No monitored endpoints registered yet.')
@@ -215,28 +240,76 @@ export default function MonitoringPage() {
     }
 
     setIsProbing(true)
-    toast.loading('Pinging registered HTTP/S endpoints and validating TLS cipher suites...', { id: 'probe' })
+    toast.loading('Pinging registered client URLs and measuring live round-trip latency...', { id: 'probe' })
 
     try {
       const now = new Date().toISOString()
       const updatedSites = await Promise.all(
         websites.map(async (site) => {
-          const latency = Math.floor(Math.random() * 70 + 65)
-          const isUp = site.status !== 'down'
-          const httpCode = isUp ? 200 : 503
+          let isUp = true
+          let latency = 85
+          let httpCode = 200
+
+          try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 7000)
+            const startTime = performance.now()
+
+            // Perform real live network probe to the client's URL
+            await fetch(site.url, {
+              method: 'GET',
+              mode: 'no-cors',
+              cache: 'no-store',
+              signal: controller.signal
+            })
+
+            clearTimeout(timeoutId)
+            latency = Math.max(12, Math.round(performance.now() - startTime))
+            isUp = true
+            httpCode = 200
+          } catch (netErr: any) {
+            // Target URL is unreachable, offline, DNS failed, or timed out
+            isUp = false
+            httpCode = 503
+            latency = 0
+          }
+
+          const newStatus: WebsiteUptimeStatus = isUp ? 'up' : 'down'
 
           // Update record in Supabase
           await (supabase as any)
             .from('monitored_websites')
             .update({
+              status: newStatus,
               http_status: httpCode,
               response_time_ms: latency,
               last_checked_at: now
             })
             .eq('id', site.id)
 
+          // If the website went down, record a log and system alert
+          if (!isUp && site.status !== 'down') {
+            await (supabase as any).from('monitoring_logs').insert({
+              website_id: site.id,
+              http_status: 503,
+              response_time_ms: 0,
+              status: 'down',
+              details: `Live probe connection refused or timed out for ${site.url}.`
+            })
+
+            await (supabase as any).from('system_alerts').insert({
+              client_id: site.client_id,
+              alert_type: 'website_down',
+              severity: 'critical',
+              title: `Downtime Detected: ${site.name}`,
+              message: `Target endpoint ${site.url} failed to respond during live HTTP heartbeat probe.`,
+              is_resolved: false
+            })
+          }
+
           return {
             ...site,
+            status: newStatus,
             http_status: httpCode,
             response_time_ms: latency,
             last_checked_at: now
@@ -245,9 +318,15 @@ export default function MonitoringPage() {
       )
 
       setWebsites(updatedSites)
-      toast.success('Heartbeat telemetry updated across all registered client sites!', { id: 'probe' })
+      
+      const downCount = updatedSites.filter((s) => s.status === 'down').length
+      if (downCount > 0) {
+        toast.error(`Probe complete: ${downCount} client site(s) unreachable or offline!`, { id: 'probe' })
+      } else {
+        toast.success('Live probe complete: All client websites are online and responding!', { id: 'probe' })
+      }
     } catch (err) {
-      toast.error('Heartbeat check completed with local metrics.', { id: 'probe' })
+      toast.error('Heartbeat check completed with local telemetry.', { id: 'probe' })
     } finally {
       setIsProbing(false)
     }
